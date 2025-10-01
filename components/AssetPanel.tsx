@@ -12,8 +12,9 @@ interface AssetPanelProps {
 // For demonstration, you could add:
 // { name: 'forest', path: '/assets/decors/forest.png', category: 'decors' },
 const initialAssets: Asset[] = [
-  { name: 'bab_manu', path: '/assets/pantins/bab_manu.svg', category: 'pantins' },
-  { name: 'lunettes_manu', path: '/assets/objets/lunettes_manu.svg', category: 'objets' },
+  { name: 'Manu', path: '/assets/pantins/bab_manu.svg', category: 'pantins' },
+  { name: 'Lunettes Manu', path: '/assets/objets/lunettes_manu.svg', category: 'objets' },
+  { name: 'Bureau', path: '/assets/decors/bureau.png', category: 'decors' },
 ];
 
 const categoryIcons: Record<AssetCategory, React.ElementType> = {
