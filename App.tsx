@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { SidePanel } from './components/SidePanel';
 import { Dock } from './components/Dock';
@@ -6,8 +5,8 @@ import { Canvas } from './components/Canvas';
 import { ResizeHandle } from './components/ResizeHandle';
 import { useResizable } from './hooks/useResizable';
 import { AssetPanel } from './components/AssetPanel';
-import type { CanvasRef } from './types';
-// FIX: Import RowsIcon to be used in the Dock component.
+import { InspectorPanel } from './components/InspectorPanel';
+import type { CanvasRef, SvgObject } from './types';
 import { RowsIcon } from './components/icons';
 
 const UI_LAYOUT_STORAGE_KEY = 'uiLayoutState';
@@ -41,6 +40,8 @@ const loadUILayout = (): UiLayout => {
 const App: React.FC = () => {
   const [initialLayout] = useState(loadUILayout);
   const canvasRef = useRef<CanvasRef>(null);
+  
+  const [selectedObject, setSelectedObject] = useState<SvgObject | null>(null);
 
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -129,6 +130,11 @@ const App: React.FC = () => {
   const handleSetBackground = (imageUrl: string) => {
     canvasRef.current?.setBackground(imageUrl);
   };
+  
+  const handleUpdateObject = (id: string, newProps: Partial<SvgObject>) => {
+    canvasRef.current?.updateObject(id, newProps);
+    setSelectedObject(prev => (prev && prev.id === id) ? { ...prev, ...newProps } : prev);
+  };
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-800 overflow-hidden">
@@ -148,29 +154,14 @@ const App: React.FC = () => {
             onToggleLeftPanel={() => setLeftPanelOpen(p => !p)}
             onToggleRightPanel={() => setRightPanelOpen(p => !p)}
             onToggleDock={() => setDockOpen(p => !p)}
+            onObjectSelect={setSelectedObject}
           />
         </div>
 
         <ResizeHandle isVisible={rightPanelOpen} {...rightResizeHandleProps} />
         
         <SidePanel side="right" isOpen={rightPanelOpen} width={rightPanelWidth}>
-           <div className="p-4">
-            <h2 className="text-lg font-bold mb-4">Inspector</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-gray-400">Transform</label>
-                <div className="p-2 bg-gray-700 rounded-md mt-1">
-                  Position, Rotation, Scale...
-                </div>
-              </div>
-              <div>
-                <label className="text-sm text-gray-400">Material</label>
-                 <div className="p-2 bg-gray-700 rounded-md mt-1">
-                  Color, Texture...
-                </div>
-              </div>
-            </div>
-          </div>
+           <InspectorPanel selectedObject={selectedObject} onUpdateObject={handleUpdateObject} />
         </SidePanel>
       </main>
 

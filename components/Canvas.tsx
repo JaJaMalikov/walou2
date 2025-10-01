@@ -3,16 +3,7 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Rnd } from 'react-rnd';
 import { UploadCloudIcon, TrashIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
-import type { CanvasRef } from '../types';
-
-interface SvgObject {
-  id: string;
-  content: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
+import type { CanvasRef, SvgObject } from '../types';
 
 interface MenuState {
   x: number;
@@ -40,11 +31,13 @@ interface CanvasProps {
   onToggleLeftPanel: () => void;
   onToggleRightPanel: () => void;
   onToggleDock: () => void;
+  onObjectSelect: (object: SvgObject | null) => void;
 }
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(({ 
   leftPanelOpen, rightPanelOpen, dockOpen,
-  onToggleLeftPanel, onToggleRightPanel, onToggleDock 
+  onToggleLeftPanel, onToggleRightPanel, onToggleDock, 
+  onObjectSelect
 }, ref) => {
   const [svgObjects, setSvgObjects] = useState<SvgObject[]>([]);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
@@ -99,7 +92,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     if (!selectedObjectId) return;
     setSvgObjects(prev => prev.filter(obj => obj.id !== selectedObjectId));
     setSelectedObjectId(null);
-  }, [selectedObjectId]);
+    onObjectSelect(null);
+  }, [selectedObjectId, onObjectSelect]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -214,6 +208,13 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       img.src = imageUrl;
     },
     fitView: fitView,
+    updateObject: (id: string, newProps: Partial<SvgObject>) => {
+      setSvgObjects(prev =>
+        prev.map(obj =>
+          obj.id === id ? { ...obj, ...newProps } : obj
+        )
+      );
+    },
   }));
 
   const handleFileDrop = useCallback((file: File) => {
@@ -249,7 +250,16 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   }, [processSvg, canvasDimensions, fitView]);
 
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
-    setSvgObjects(prev => prev.map(obj => obj.id === id ? { ...obj, x: d.x, y: d.y } : obj));
+    setSvgObjects(prev =>
+      prev.map(obj => {
+        if (obj.id === id) {
+          const updatedObj = { ...obj, x: d.x, y: d.y };
+          onObjectSelect(updatedObj);
+          return updatedObj;
+        }
+        return obj;
+      })
+    );
   };
 
   const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }, []);
@@ -270,6 +280,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     setCanvasDimensions(null);
     setError(null);
     setSelectedObjectId(null);
+    onObjectSelect(null);
     if (transformWrapperRef.current) {
         transformWrapperRef.current.resetTransform();
     }
@@ -278,6 +289,16 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   const handleMenuChange = (updates: Partial<MenuState>) => {
     setMenuState(prev => ({ ...prev, ...updates }));
   };
+  
+  const handleSelectObject = (obj: SvgObject) => {
+    setSelectedObjectId(obj.id);
+    onObjectSelect(obj);
+  };
+  
+  const handleDeselect = () => {
+    setSelectedObjectId(null);
+    onObjectSelect(null);
+  }
 
   const hasContent = svgObjects.length > 0 || backgroundImageUrl;
   
@@ -324,7 +345,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
             <TransformComponent wrapperClass="!w-full !h-full">
               <div
                 id="canvas-area"
-                onMouseDown={() => setSelectedObjectId(null)}
+                onMouseDown={handleDeselect}
                 className={`relative bg-cover bg-center transition-all duration-300 ${!hasContent ? `border-2 border-dashed rounded-lg ${isDragging ? 'border-blue-400 bg-blue-900/50' : 'border-gray-600'}` : 'shadow-2xl bg-gray-900/50'}`}
                 style={canvasDimensions ? { width: `${canvasDimensions.width}px`, height: `${canvasDimensions.height}px`, backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : 'none' } : {}}
               >
@@ -338,7 +359,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     position={{ x: obj.x, y: obj.y }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
-                      setSelectedObjectId(obj.id);
+                      handleSelectObject(obj);
                     }}
                     onDragStart={() => setIsObjectInteracting(true)}
                     onDragStop={(_, d) => {
@@ -348,18 +369,22 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     onResizeStart={() => setIsObjectInteracting(true)}
                     onResizeStop={(_, __, ref, ___, position) => {
                       setIsObjectInteracting(false);
-                      setSvgObjects(prev =>
-                        prev.map(o =>
-                          o.id === obj.id
-                            ? {
-                                ...o,
-                                width: parseInt(ref.style.width, 10),
-                                height: parseInt(ref.style.height, 10),
-                                ...position,
-                              }
-                            : o
-                        )
-                      );
+                      setSvgObjects(prev => {
+                        const newObjects = prev.map(o => {
+                          if (o.id === obj.id) {
+                            const updatedObj = {
+                              ...o,
+                              width: parseInt(ref.style.width, 10),
+                              height: parseInt(ref.style.height, 10),
+                              ...position,
+                            };
+                            onObjectSelect(updatedObj);
+                            return updatedObj;
+                          }
+                          return o;
+                        });
+                        return newObjects;
+                      });
                     }}
                     bounds="parent"
                     className={`box-border border-2 ${selectedObjectId === obj.id ? 'border-blue-500' : 'border-transparent hover:border-blue-500/50'}`}

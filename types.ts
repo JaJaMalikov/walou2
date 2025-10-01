@@ -10,8 +10,19 @@ export interface Asset {
   content?: string; // For SVGs
 }
 
+export interface SvgObject {
+  id: string;
+  content: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+
 export type CanvasRef = {
   addObject: (svgContent: string) => void;
   setBackground: (imageUrl: string) => void;
   fitView: () => void;
+  updateObject: (id: string, newProps: Partial<SvgObject>) => void;
 };
