@@ -1,0 +1,72 @@
+function bringToFront(el: Element | null): void {
+  if (el && el.parentNode) el.parentNode.appendChild(el);
+}
+
+function sendToBack(el: Element | null): void {
+  if (el && el.parentNode) el.parentNode.insertBefore(el, el.parentNode.firstChild);
+}
+
+function moveBefore(el: Element | null, target: Element | null): void {
+  if (el && target && target.parentNode) target.parentNode.insertBefore(el, target);
+}
+
+function moveAfter(el: Element | null, target: Element | null): void {
+  if (el && target && target.parentNode) target.parentNode.insertBefore(el, target.nextSibling);
+}
+
+function findPivotCoords(el: SVGElement | null): string | null {
+  if (!el || !el.parentNode) return null;
+  const parent = el.parentNode as Element;
+  const pivotCircle = parent.querySelector("circle.pivot") as SVGCircleElement | null;
+  if (!pivotCircle) return null;
+
+  const cx = parseFloat(pivotCircle.getAttribute("cx") || "");
+  const cy = parseFloat(pivotCircle.getAttribute("cy") || "");
+  if (isNaN(cx) || isNaN(cy)) return null;
+
+  return `${cx}px ${cy}px`;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  // Configuration des éléments du pantin
+  const puppetElements: Record<string, SVGElement | null> = {
+    tete: document.querySelector("#tete"),
+    haut_bras_droite: document.querySelector("#haut_bras_droite"),
+    avant_bras_droite: document.querySelector("#avant_bras_droite"),
+    main_droite: document.querySelector("#main_droite"),
+    haut_bras_gauche: document.querySelector("#haut_bras_gauche"),
+    avant_bras_gauche: document.querySelector("#avant_bras_gauche"),
+    main_gauche: document.querySelector("#main_gauche"),
+    cuisse_droite: document.querySelector("#cuisse_droite"),
+    tibia_droite: document.querySelector("#tibia_droite"),
+    pied_droite: document.querySelector("#pied_droite"),
+    cuisse_gauche: document.querySelector("#cuisse_gauche"),
+    tibia_gauche: document.querySelector("#tibia_gauche"),
+    pied_gauche: document.querySelector("#pied_gauche"),
+  };
+
+  // Initialisation: calculer dynamiquement les pivots et les appliquer
+  Object.entries(puppetElements).forEach(([name, el]) => {
+    const pivot = findPivotCoords(el);
+    if (el && pivot) {
+      el.style.transformOrigin = pivot;
+      (el.style as any).transformBox = "view-box";
+    }
+  });
+
+  // Applique une rotation au groupe demandé
+  function applyRotation(elementName: string, angle: number): void {
+    const el = puppetElements[elementName];
+    if (el) {
+      el.style.transform = `rotate(${angle}deg)`;
+    } else {
+      // console.warn("Élément manquant:", elementName);
+    }
+  }
+
+  // Ajustements de z-order pour certains éléments (si présents)
+  ["poignet_droite", "poignet_gauche", "hanche_droite", "hanche_gauche"].forEach((id) => {
+    const node = document.getElementById(id);
+    if (node) sendToBack(node);
+  });
+});

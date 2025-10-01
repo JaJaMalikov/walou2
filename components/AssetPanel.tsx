@@ -3,7 +3,7 @@ import { Asset, AssetCategory } from '../types';
 import { UserIcon, ShapesIcon, ImageIcon } from './icons';
 
 interface AssetPanelProps {
-  onAddObject: (svgContent: string) => void;
+  onAddObject: (svgContent: string, category: AssetCategory) => void;
   onSetBackground: (imageUrl: string) => void;
 }
 
@@ -104,7 +104,7 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
                         if (asset.category === 'decors') {
                             onSetBackground(asset.path);
                         } else if (asset.content) {
-                            onAddObject(asset.content);
+                            onAddObject(asset.content, asset.category);
                         }
                     }}
                     className="aspect-square bg-gray-700 rounded-md p-2 flex items-center justify-center hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"

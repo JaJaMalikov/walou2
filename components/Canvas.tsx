@@ -3,7 +3,8 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Rnd } from 'react-rnd';
 import { UploadCloudIcon, TrashIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
-import type { CanvasRef, SvgObject } from '../types';
+import type { CanvasRef, SvgObject, AssetCategory } from '../types';
+import { Pantin } from './Pantin';
 
 interface MenuState {
   x: number;
@@ -174,39 +175,45 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     setTransform(newPositionX, newPositionY, newScale, 300, 'easeOut');
   }, [canvasDimensions, svgObjects]);
 
+  const addObject = useCallback((svgContent: string, category: AssetCategory) => {
+    const wrapperComponent = transformWrapperRef.current?.instance.wrapperComponent;
+    if (!wrapperComponent || !transformState) return;
+    
+    const viewRect = wrapperComponent.getBoundingClientRect();
+    const dimensions = getSvgDimensions(svgContent);
+
+    const centerX = (viewRect.width / 2 - transformState.positionX) / transformState.scale;
+    const centerY = (viewRect.height / 2 - transformState.positionY) / transformState.scale;
+
+    const newSvg: SvgObject = {
+      id: `svg-${Date.now()}`,
+      content: processSvg(svgContent),
+      x: centerX - dimensions.width / 2,
+      y: centerY - dimensions.height / 2,
+      ...dimensions,
+      category,
+      ...(category === 'pantins' && { articulation: {} }),
+    };
+    setSvgObjects(prev => [...prev, newSvg]);
+  }, [processSvg, transformState]);
+
+  const setBackground = useCallback((imageUrl: string) => {
+    setError(null);
+    const img = new Image();
+    img.onload = () => {
+      setBackgroundImageUrl(imageUrl);
+      setCanvasDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+      setTimeout(fitView, 100);
+    };
+    img.onerror = () => {
+      setError("Failed to load the background image.");
+    };
+    img.src = imageUrl;
+  }, [fitView]);
+
   useImperativeHandle(ref, () => ({
-    addObject: (svgContent: string) => {
-      const wrapperComponent = transformWrapperRef.current?.instance.wrapperComponent;
-      if (!wrapperComponent || !transformState) return;
-      
-      const viewRect = wrapperComponent.getBoundingClientRect();
-      const dimensions = getSvgDimensions(svgContent);
-
-      const centerX = (viewRect.width / 2 - transformState.positionX) / transformState.scale;
-      const centerY = (viewRect.height / 2 - transformState.positionY) / transformState.scale;
-
-      const newSvg: SvgObject = {
-        id: `svg-${Date.now()}`,
-        content: processSvg(svgContent),
-        x: centerX - dimensions.width / 2,
-        y: centerY - dimensions.height / 2,
-        ...dimensions,
-      };
-      setSvgObjects(prev => [...prev, newSvg]);
-    },
-    setBackground: (imageUrl: string) => {
-      setError(null);
-      const img = new Image();
-      img.onload = () => {
-        setBackgroundImageUrl(imageUrl);
-        setCanvasDimensions({ width: img.naturalWidth, height: img.naturalHeight });
-        setTimeout(fitView, 100);
-      };
-      img.onerror = () => {
-        setError("Failed to load the background image.");
-      };
-      img.src = imageUrl;
-    },
+    addObject: addObject,
+    setBackground: setBackground,
     fitView: fitView,
     updateObject: (id: string, newProps: Partial<SvgObject>) => {
       setSvgObjects(prev =>
@@ -219,52 +226,36 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
   const handleFileDrop = useCallback((file: File) => {
     setError(null);
-    const fileUrl = URL.createObjectURL(file);
     if (file.type.startsWith('image/png')) {
-        const img = new Image();
-        img.onload = () => {
-            setBackgroundImageUrl(fileUrl);
-            setCanvasDimensions({ width: img.naturalWidth, height: img.naturalHeight });
-            setTimeout(fitView, 100);
-        };
-        img.src = fileUrl;
+        const fileUrl = URL.createObjectURL(file);
+        setBackground(fileUrl);
     } else if (file.type === 'image/svg+xml') {
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        const dimensions = getSvgDimensions(text);
-        const newSvg: SvgObject = {
-          id: `svg-${Date.now()}`,
-          content: processSvg(text),
-          x: (canvasDimensions?.width || 800) / 2 - dimensions.width / 2,
-          y: (canvasDimensions?.height || 600) / 2 - dimensions.height / 2,
-          ...dimensions,
-        };
-        setSvgObjects(prev => [...prev, newSvg]);
+        addObject(text, 'objets'); // Default to 'objets' for dropped SVGs
       };
       reader.readAsText(file);
     } else {
       setError('Invalid file type. Please drop a PNG or SVG file.');
-       URL.revokeObjectURL(fileUrl);
     }
-  }, [processSvg, canvasDimensions, fitView]);
+  }, [addObject, setBackground]);
 
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
-    let selectedObject: SvgObject | null = null;
+    setIsObjectInteracting(false);
     setSvgObjects(prev =>
-      prev.map(obj => {
-        if (obj.id === id) {
-          const updatedObj = { ...obj, x: d.x, y: d.y };
-          selectedObject = updatedObj;
-          return updatedObj;
-        }
-        return obj;
-      })
+        prev.map(obj => (obj.id === id ? { ...obj, x: d.x, y: d.y } : obj))
     );
-    if(selectedObject) {
-      onObjectSelect(selectedObject);
-    }
   };
+  
+  // This effect safely synchronizes the selected object state with the parent component.
+  useEffect(() => {
+    if (selectedObjectId) {
+        const selected = svgObjects.find(obj => obj.id === selectedObjectId);
+        onObjectSelect(selected || null);
+    }
+  }, [svgObjects, selectedObjectId, onObjectSelect]);
+
 
   const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }, []);
@@ -366,40 +357,33 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                       handleSelectObject(obj);
                     }}
                     onDragStart={() => setIsObjectInteracting(true)}
-                    onDragStop={(_, d) => {
-                      setIsObjectInteracting(false);
-                      handleDragStop(obj.id, d);
-                    }}
+                    onDragStop={(_, d) => handleDragStop(obj.id, d)}
                     onResizeStart={() => setIsObjectInteracting(true)}
                     onResizeStop={(_, __, ref, ___, position) => {
                       setIsObjectInteracting(false);
-                      let selectedObject: SvgObject | null = null;
-                      setSvgObjects(prev => {
-                        return prev.map(o => {
+                      setSvgObjects(prev => prev.map(o => {
                           if (o.id === obj.id) {
-                            const updatedObj = {
+                            return {
                               ...o,
                               width: parseInt(ref.style.width, 10),
                               height: parseInt(ref.style.height, 10),
                               ...position,
                             };
-                            selectedObject = updatedObj;
-                            return updatedObj;
                           }
                           return o;
-                        });
-                      });
-                      if (selectedObject) {
-                          onObjectSelect(selectedObject);
-                      }
+                        }));
                     }}
                     bounds="parent"
                     className={`box-border border-2 ${selectedObjectId === obj.id ? 'border-blue-500' : 'border-transparent hover:border-blue-500/50'}`}
                   >
-                    <div
-                      className="w-full h-full [&>svg]:w-full [&>svg]:h-full"
-                      dangerouslySetInnerHTML={{ __html: obj.content }}
-                    />
+                   {obj.category === 'pantins' ? (
+                      <Pantin object={obj} />
+                    ) : (
+                       <div
+                        className="w-full h-full [&>svg]:w-full [&>svg]:h-full"
+                        dangerouslySetInnerHTML={{ __html: obj.content }}
+                      />
+                    )}
                   </Rnd>
                 ))}
 

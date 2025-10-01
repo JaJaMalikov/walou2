@@ -17,11 +17,13 @@ export interface SvgObject {
   y: number;
   width: number;
   height: number;
+  category: AssetCategory;
+  articulation?: { [key: string]: number }; // e.g. { tete: -15, bras_gauche: 20 }
 }
 
 
 export type CanvasRef = {
-  addObject: (svgContent: string) => void;
+  addObject: (svgContent: string, category: AssetCategory) => void;
   setBackground: (imageUrl: string) => void;
   fitView: () => void;
   updateObject: (id: string, newProps: Partial<SvgObject>) => void;

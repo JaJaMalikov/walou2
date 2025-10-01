@@ -6,7 +6,7 @@ import { ResizeHandle } from './components/ResizeHandle';
 import { useResizable } from './hooks/useResizable';
 import { AssetPanel } from './components/AssetPanel';
 import { InspectorPanel } from './components/InspectorPanel';
-import type { CanvasRef, SvgObject } from './types';
+import type { CanvasRef, SvgObject, AssetCategory } from './types';
 import { RowsIcon } from './components/icons';
 
 const UI_LAYOUT_STORAGE_KEY = 'uiLayoutState';
@@ -123,8 +123,8 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const handleAddObject = (svgContent: string) => {
-    canvasRef.current?.addObject(svgContent);
+  const handleAddObject = (svgContent: string, category: AssetCategory) => {
+    canvasRef.current?.addObject(svgContent, category);
   };
   
   const handleSetBackground = (imageUrl: string) => {
@@ -132,8 +132,22 @@ const App: React.FC = () => {
   };
   
   const handleUpdateObject = (id: string, newProps: Partial<SvgObject>) => {
-    canvasRef.current?.updateObject(id, newProps);
-    setSelectedObject(prev => (prev && prev.id === id) ? { ...prev, ...newProps } : prev);
+    const currentObject = selectedObject?.id === id ? selectedObject : null;
+    let finalProps = newProps;
+
+    // Deep merge articulation properties
+    if (newProps.articulation && currentObject?.articulation) {
+        finalProps = {
+            ...newProps,
+            articulation: {
+                ...currentObject.articulation,
+                ...newProps.articulation,
+            },
+        };
+    }
+    
+    canvasRef.current?.updateObject(id, finalProps);
+    setSelectedObject(prev => (prev && prev.id === id) ? { ...prev, ...finalProps } : prev);
   };
 
   return (
