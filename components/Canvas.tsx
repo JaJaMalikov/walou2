@@ -180,10 +180,11 @@ export const Canvas: React.FC = () => {
         minScale={0.1}
         limitToBounds={!!canvasDimensions}
         doubleClick={{ disabled: true }}
+        centerZoomedOut={true}
       >
         {({ zoomToElement }) => (
           <>
-            <Controls fitView={() => canvasDimensions && zoomToElement('canvas-area', 0.95)} />
+            <Controls fitView={() => canvasDimensions && zoomToElement('canvas-area', 0.9)} />
             <div className="absolute top-4 right-4 z-10 flex gap-2">
                 {hasContent && (
                      <button onClick={resetCanvas} className="p-2 bg-red-800/50 backdrop-blur-sm rounded-md hover:bg-red-700/70 transition-colors" aria-label="Reset Canvas">
@@ -191,7 +192,7 @@ export const Canvas: React.FC = () => {
                     </button>
                 )}
             </div>
-            <TransformComponent wrapperClass="!w-full !h-full" contentClass="w-full h-full flex items-center justify-center">
+            <TransformComponent wrapperClass="!w-full !h-full">
               <div
                 id="canvas-area"
                 className={`relative bg-cover bg-center transition-all duration-300 ${!hasContent ? `border-2 border-dashed rounded-lg ${isDragging ? 'border-blue-400 bg-blue-900/50' : 'border-gray-600'}` : 'shadow-2xl bg-gray-900/50'}`}
