@@ -136,10 +136,11 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   };
   
   const fitView = useCallback(() => {
-    const instance = transformWrapperRef.current?.instance;
-    if (!instance) return;
+    const transformWrapper = transformWrapperRef.current;
+    if (!transformWrapper) return;
 
-    const { setTransform, wrapperComponent } = instance;
+    const { setTransform } = transformWrapper;
+    const wrapperComponent = transformWrapper.instance.wrapperComponent;
     if (!wrapperComponent) return;
 
     const viewRect = wrapperComponent.getBoundingClientRect();
@@ -270,7 +271,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     setError(null);
     setSelectedObjectId(null);
     if (transformWrapperRef.current) {
-        transformWrapperRef.current.instance.resetTransform();
+        transformWrapperRef.current.resetTransform();
     }
   };
 
@@ -296,9 +297,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         onToggleRightPanel={onToggleRightPanel}
         onToggleDock={onToggleDock}
         onFitView={fitView}
-        onZoomIn={() => transformWrapperRef.current?.instance.zoomIn()}
-        onZoomOut={() => transformWrapperRef.current?.instance.zoomOut()}
-        onResetTransform={() => transformWrapperRef.current?.instance.resetTransform()}
+        onZoomIn={() => transformWrapperRef.current?.zoomIn()}
+        onZoomOut={() => transformWrapperRef.current?.zoomOut()}
+        onResetTransform={() => transformWrapperRef.current?.resetTransform()}
       />
       <TransformWrapper
         ref={transformWrapperRef}
