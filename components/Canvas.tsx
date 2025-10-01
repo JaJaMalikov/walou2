@@ -1,8 +1,9 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
 import { Rnd } from 'react-rnd';
 import { ZoomInIcon, ZoomOutIcon, ExpandIcon, UploadCloudIcon, TrashIcon, FitToScreenIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
+import type { CanvasRef } from '../types';
 
 interface SvgObject {
   id: string;
@@ -44,7 +45,7 @@ const Controls = ({ fitView }: { fitView: () => void }) => {
     );
 };
 
-export const Canvas: React.FC = () => {
+export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
   const [svgObjects, setSvgObjects] = useState<SvgObject[]>([]);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState<{width: number, height: number} | null>(null);
@@ -133,6 +134,29 @@ export const Canvas: React.FC = () => {
     }
     return { width: 200, height: 200 }; // Fallback
   };
+  
+  useImperativeHandle(ref, () => ({
+    addObject: (svgContent: string) => {
+      const wrapperComponent = transformWrapperRef.current?.instance.wrapperComponent;
+      if (!wrapperComponent || !transformState) return;
+      
+      const viewRect = wrapperComponent.getBoundingClientRect();
+      const dimensions = getSvgDimensions(svgContent);
+
+      // Calculate center of the viewport in canvas coordinates
+      const centerX = (viewRect.width / 2 - transformState.positionX) / transformState.scale;
+      const centerY = (viewRect.height / 2 - transformState.positionY) / transformState.scale;
+
+      const newSvg: SvgObject = {
+        id: `svg-${Date.now()}`,
+        content: processSvg(svgContent),
+        x: centerX - dimensions.width / 2,
+        y: centerY - dimensions.height / 2,
+        ...dimensions,
+      };
+      setSvgObjects(prev => [...prev, newSvg]);
+    }
+  }));
 
   const handleFileDrop = useCallback((file: File) => {
     setError(null);
@@ -344,4 +368,4 @@ export const Canvas: React.FC = () => {
       )}
     </div>
   );
-};
+});

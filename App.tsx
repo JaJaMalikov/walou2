@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { SidePanel } from './components/SidePanel';
 import { Dock } from './components/Dock';
 import { Canvas } from './components/Canvas';
 import { ResizeHandle } from './components/ResizeHandle';
 import { useResizable } from './hooks/useResizable';
 import { PanelLeftIcon, PanelRightIcon, RowsIcon } from './components/icons';
+import { AssetPanel } from './components/AssetPanel';
+import type { CanvasRef } from './types';
 
 const UI_LAYOUT_STORAGE_KEY = 'uiLayoutState';
 
@@ -36,6 +38,7 @@ const loadUILayout = (): UiLayout => {
 
 const App: React.FC = () => {
   const [initialLayout] = useState(loadUILayout);
+  const canvasRef = useRef<CanvasRef>(null);
 
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -84,6 +87,10 @@ const App: React.FC = () => {
     };
   }, [leftPanelWidth, rightPanelWidth, dockHeight]);
 
+  const handleAddObject = (svgContent: string) => {
+    canvasRef.current?.addObject(svgContent);
+  };
+
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-800 overflow-hidden">
       <header className="absolute top-0 left-0 p-4 z-30 flex gap-2">
@@ -112,20 +119,13 @@ const App: React.FC = () => {
 
       <main className="flex-1 flex flex-row min-h-0">
         <SidePanel side="left" isOpen={leftPanelOpen} width={leftPanelWidth}>
-          <div className="p-4">
-            <h2 className="text-lg font-bold mb-4">Navigator</h2>
-            <ul className="space-y-2">
-              <li className="p-2 bg-gray-700 rounded-md">Scene 1</li>
-              <li className="p-2 bg-gray-600 rounded-md">Main Camera</li>
-              <li className="p-2 bg-gray-600 rounded-md">Directional Light</li>
-            </ul>
-          </div>
+          <AssetPanel onAddObject={handleAddObject} />
         </SidePanel>
 
         <ResizeHandle isVisible={leftPanelOpen} {...leftResizeHandleProps} />
 
         <div className="flex-1 flex flex-col min-w-0 relative">
-          <Canvas />
+          <Canvas ref={canvasRef} />
         </div>
 
         <ResizeHandle isVisible={rightPanelOpen} {...rightResizeHandleProps} />

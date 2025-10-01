@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface SidePanelProps {
@@ -13,7 +12,7 @@ export const SidePanel: React.FC<SidePanelProps> = ({ side, isOpen, width, child
 
   return (
     <aside
-      className={`bg-gray-800 border-gray-700 flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden ${sideClasses}`}
+      className={`bg-gray-800 border-gray-700 flex-shrink-0 transition-all duration-300 ease-in-out overflow-hidden flex flex-col ${sideClasses}`}
       style={{ width: isOpen ? `${width}px` : '0px' }}
       aria-hidden={!isOpen}
     >
