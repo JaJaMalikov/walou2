@@ -1,0 +1,5 @@
+{
+  "name": "Copy of Modern Interactive UI Builder",
+  "description": "A modern graphical interface featuring a resizable dock, draggable and togglable side panels, a floating menu, and a central canvas that supports drag-and-drop, zoom, pan, and SVG file rendering.",
+  "requestFramePermissions": []
+}
