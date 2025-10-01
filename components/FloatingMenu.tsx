@@ -1,64 +1,70 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { Rnd } from 'react-rnd';
-import { MoveIcon, ChevronsRightLeftIcon, MinusIcon, TrashIcon } from './icons';
+import { MoveIcon, TrashIcon, ZoomInIcon, ExpandIcon } from './icons';
+
+interface MenuState {
+  x: number;
+  y: number;
+  width: number | string;
+  height: number | string;
+}
 
 interface FloatingMenuProps {
+  menuState: MenuState;
+  onMenuChange: (updates: Partial<MenuState>) => void;
   selectedObjectId: string | null;
   onDelete: () => void;
 }
 
-export const FloatingMenu: React.FC<FloatingMenuProps> = ({ selectedObjectId, onDelete }) => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
+export const FloatingMenu: React.FC<FloatingMenuProps> = ({ menuState, onMenuChange, selectedObjectId, onDelete }) => {
   return (
     <Rnd
-      default={{
-        x: 50,
-        y: 80,
-        width: 220,
-        height: 'auto',
+      size={{ width: menuState.width, height: menuState.height }}
+      position={{ x: menuState.x, y: menuState.y }}
+      onDragStop={(_, d) => onMenuChange({ x: d.x, y: d.y })}
+      onResizeStop={(_, __, ref, ___, position) => {
+        onMenuChange({
+          width: ref.style.width,
+          height: ref.style.height,
+          ...position,
+        });
       }}
       minWidth={200}
-      minHeight={50}
+      minHeight={52}
       bounds="parent"
       dragHandleClassName="drag-handle"
       className="z-20"
     >
-      <div className="bg-gray-700/60 backdrop-blur-lg rounded-lg shadow-2xl h-full flex flex-col border border-gray-500/50">
-        <header className="drag-handle cursor-move p-2 flex justify-between items-center border-b border-gray-500/50">
-          <div className="flex items-center gap-2">
-            <MoveIcon className="w-4 h-4 text-gray-400" />
-            <h3 className="font-bold text-sm">Tools</h3>
-          </div>
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1 hover:bg-gray-600/50 rounded"
-            aria-label={isCollapsed ? "Expand menu" : "Collapse menu"}
-          >
-            {isCollapsed ? <ChevronsRightLeftIcon className="w-4 h-4" /> : <MinusIcon className="w-4 h-4" />}
-          </button>
-        </header>
-
-        {!isCollapsed && (
-          <div className="p-3">
-            <ul className="space-y-2 text-sm">
-                <li
-                  className={`flex items-center gap-2 p-2 rounded ${selectedObjectId ? 'hover:bg-red-800/50 cursor-pointer text-red-300' : 'cursor-not-allowed text-gray-500'}`}
-                  onClick={selectedObjectId ? onDelete : undefined}
-                  aria-disabled={!selectedObjectId}
-                >
-                    <TrashIcon className="w-4 h-4"/>
-                    <span>Delete Selected</span>
-                </li>
-                <hr className="border-gray-600 my-2" />
-                <li className="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">Tool Option 1</li>
-                <li className="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">Tool Option 2</li>
-                <li className="flex items-center gap-2 p-2 rounded bg-blue-600/30 text-blue-200 cursor-pointer">Active Tool</li>
-                <li className="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">Another Tool</li>
-            </ul>
-          </div>
-        )}
+      <div className="bg-gray-700/60 backdrop-blur-lg rounded-lg shadow-2xl h-full w-full flex items-center p-1 border border-gray-500/50" role="toolbar">
+        <button className="drag-handle cursor-move p-2 text-gray-400 hover:text-white flex-shrink-0 rounded-full" aria-label="Move toolbar">
+          <MoveIcon className="w-5 h-5" />
+        </button>
+        <div className="w-px h-6 bg-gray-500/50 mx-1 flex-shrink-0"></div>
+        <div className="flex items-center gap-1 px-1 flex-wrap">
+            <button
+                title="Delete Selected"
+                aria-label="Delete Selected"
+                onClick={selectedObjectId ? onDelete : undefined}
+                disabled={!selectedObjectId}
+                className="p-2 rounded-full transition-colors enabled:hover:bg-red-800/50 disabled:cursor-not-allowed disabled:text-gray-500 enabled:text-red-300"
+            >
+                <TrashIcon className="w-5 h-5"/>
+            </button>
+             <button
+                title="Placeholder Tool 1"
+                aria-label="Placeholder Tool 1"
+                className="p-2 rounded-full text-gray-300 transition-colors hover:bg-gray-600/50 hover:text-white"
+            >
+                <ZoomInIcon className="w-5 h-5" />
+            </button>
+            <button
+                title="Placeholder Tool 2"
+                aria-label="Placeholder Tool 2"
+                className="p-2 rounded-full text-gray-300 transition-colors hover:bg-gray-600/50 hover:text-white"
+            >
+                <ExpandIcon className="w-5 h-5" />
+            </button>
+        </div>
       </div>
     </Rnd>
   );

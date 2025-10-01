@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SidePanel } from './components/SidePanel';
 import { Dock } from './components/Dock';
 import { Canvas } from './components/Canvas';
@@ -7,13 +6,43 @@ import { ResizeHandle } from './components/ResizeHandle';
 import { useResizable } from './hooks/useResizable';
 import { PanelLeftIcon, PanelRightIcon, RowsIcon } from './components/icons';
 
+const UI_LAYOUT_STORAGE_KEY = 'uiLayoutState';
+
+interface UiLayout {
+  leftPanelWidth: number;
+  rightPanelWidth: number;
+  dockHeight: number;
+}
+
+const loadUILayout = (): UiLayout => {
+  try {
+    const saved = localStorage.getItem(UI_LAYOUT_STORAGE_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.leftPanelWidth && parsed.rightPanelWidth && parsed.dockHeight) {
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.error("Failed to load UI layout from localStorage", error);
+  }
+  return {
+    leftPanelWidth: 280,
+    rightPanelWidth: 280,
+    dockHeight: 150,
+  };
+};
+
+
 const App: React.FC = () => {
+  const [initialLayout] = useState(loadUILayout);
+
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [dockOpen, setDockOpen] = useState(true);
 
   const [leftPanelWidth, leftResizeHandleProps] = useResizable({
-    initialSize: 280,
+    initialSize: initialLayout.leftPanelWidth,
     minSize: 200,
     maxSize: 500,
     axis: 'x',
@@ -21,7 +50,7 @@ const App: React.FC = () => {
   });
   
   const [rightPanelWidth, rightResizeHandleProps] = useResizable({
-    initialSize: 280,
+    initialSize: initialLayout.rightPanelWidth,
     minSize: 200,
     maxSize: 500,
     axis: 'x',
@@ -29,12 +58,31 @@ const App: React.FC = () => {
   });
 
   const [dockHeight, dockResizeHandleProps] = useResizable({
-    initialSize: 150,
+    initialSize: initialLayout.dockHeight,
     minSize: 80,
     maxSize: 400,
     axis: 'y',
     direction: 'up',
   });
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      try {
+        const layout: UiLayout = {
+          leftPanelWidth,
+          rightPanelWidth,
+          dockHeight,
+        };
+        localStorage.setItem(UI_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+      } catch (error) {
+        console.error("Failed to save UI layout to localStorage", error);
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [leftPanelWidth, rightPanelWidth, dockHeight]);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-800 overflow-hidden">

@@ -1,11 +1,9 @@
-
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
 import { Rnd } from 'react-rnd';
 import { ZoomInIcon, ZoomOutIcon, ExpandIcon, UploadCloudIcon, TrashIcon, FitToScreenIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
 
-// Type for individual SVG objects on the canvas
 interface SvgObject {
   id: string;
   content: string;
@@ -15,7 +13,13 @@ interface SvgObject {
   height: number;
 }
 
-// Type for the overall canvas state for persistence
+interface MenuState {
+  x: number;
+  y: number;
+  width: number | string;
+  height: number | string;
+}
+
 interface CanvasState {
   svgObjects: SvgObject[];
   backgroundImageUrl: string | null;
@@ -25,6 +29,7 @@ interface CanvasState {
     positionX: number;
     positionY: number;
   };
+  menuState?: MenuState;
 }
 
 const Controls = ({ fitView }: { fitView: () => void }) => {
@@ -44,6 +49,7 @@ export const Canvas: React.FC = () => {
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState<{width: number, height: number} | null>(null);
   const [transformState, setTransformState] = useState<CanvasState['transformState'] | null>(null);
+  const [menuState, setMenuState] = useState<MenuState>({ x: 50, y: 80, width: 220, height: 52 });
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isObjectInteracting, setIsObjectInteracting] = useState(false);
@@ -60,6 +66,7 @@ export const Canvas: React.FC = () => {
         setBackgroundImageUrl(savedState.backgroundImageUrl || null);
         setCanvasDimensions(savedState.canvasDimensions || null);
         setTransformState(savedState.transformState || { scale: 1, positionX: 0, positionY: 0 });
+        setMenuState(savedState.menuState || { x: 50, y: 80, width: 220, height: 52 });
       } else {
         setTransformState({ scale: 1, positionX: 0, positionY: 0 });
       }
@@ -78,13 +85,14 @@ export const Canvas: React.FC = () => {
         backgroundImageUrl,
         canvasDimensions,
         transformState,
+        menuState,
       };
       localStorage.setItem('canvasState', JSON.stringify(stateToSave));
     } catch (err) {
       console.error("Failed to save canvas state to localStorage", err);
       setError("Could not save progress.");
     }
-  }, [svgObjects, backgroundImageUrl, canvasDimensions, transformState]);
+  }, [svgObjects, backgroundImageUrl, canvasDimensions, transformState, menuState]);
 
   const deleteSelectedObject = useCallback(() => {
     if (!selectedObjectId) return;
@@ -174,7 +182,6 @@ export const Canvas: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
-    // FIX: Corrected typo from `e.datatransfer` to `e.dataTransfer`.
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFileDrop(e.dataTransfer.files[0]);
       e.dataTransfer.clearData();
@@ -190,13 +197,22 @@ export const Canvas: React.FC = () => {
     setTransformState({ scale: 1, positionX: 0, positionY: 0 });
   };
 
+  const handleMenuChange = (updates: Partial<MenuState>) => {
+    setMenuState(prev => ({ ...prev, ...updates }));
+  };
+
   const hasContent = svgObjects.length > 0 || backgroundImageUrl;
   
   if (!transformState) return <div className="flex-1 bg-gray-900 relative w-full h-full" />;
 
   return (
     <div className="flex-1 bg-gray-900 relative w-full h-full" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
-       <FloatingMenu selectedObjectId={selectedObjectId} onDelete={deleteSelectedObject} />
+       <FloatingMenu 
+        menuState={menuState}
+        onMenuChange={handleMenuChange}
+        selectedObjectId={selectedObjectId} 
+        onDelete={deleteSelectedObject} 
+      />
       <TransformWrapper
         ref={transformWrapperRef}
         initialScale={transformState.scale}
