@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { SidePanel } from './components/SidePanel';
 import { Dock } from './components/Dock';
 import { Canvas } from './components/Canvas';
-import { FloatingMenu } from './components/FloatingMenu';
 import { ResizeHandle } from './components/ResizeHandle';
 import { useResizable } from './hooks/useResizable';
 import { PanelLeftIcon, PanelRightIcon, RowsIcon } from './components/icons';
@@ -79,7 +78,6 @@ const App: React.FC = () => {
 
         <div className="flex-1 flex flex-col min-w-0 relative">
           <Canvas />
-          <FloatingMenu />
         </div>
 
         <ResizeHandle isVisible={rightPanelOpen} {...rightResizeHandleProps} />

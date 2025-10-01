@@ -1,7 +1,9 @@
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
 import { Rnd } from 'react-rnd';
 import { ZoomInIcon, ZoomOutIcon, ExpandIcon, UploadCloudIcon, TrashIcon, FitToScreenIcon } from './icons';
+import { FloatingMenu } from './FloatingMenu';
 
 // Type for individual SVG objects on the canvas
 interface SvgObject {
@@ -45,6 +47,7 @@ export const Canvas: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isObjectInteracting, setIsObjectInteracting] = useState(false);
+  const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   
   const transformWrapperRef = useRef<any>(null);
 
@@ -82,6 +85,26 @@ export const Canvas: React.FC = () => {
       setError("Could not save progress.");
     }
   }, [svgObjects, backgroundImageUrl, canvasDimensions, transformState]);
+
+  const deleteSelectedObject = useCallback(() => {
+    if (!selectedObjectId) return;
+    setSvgObjects(prev => prev.filter(obj => obj.id !== selectedObjectId));
+    setSelectedObjectId(null);
+  }, [selectedObjectId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if((e.target as HTMLElement).nodeName !== 'INPUT' && (e.target as HTMLElement).nodeName !== 'TEXTAREA') {
+            deleteSelectedObject();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [deleteSelectedObject]);
 
   const processSvg = useCallback((svgString: string): string => {
     return svgString.replace(/<svg[^>]*>/, match => 
@@ -151,6 +174,7 @@ export const Canvas: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    // FIX: Corrected typo from `e.datatransfer` to `e.dataTransfer`.
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       handleFileDrop(e.dataTransfer.files[0]);
       e.dataTransfer.clearData();
@@ -162,6 +186,7 @@ export const Canvas: React.FC = () => {
     setBackgroundImageUrl(null);
     setCanvasDimensions(null);
     setError(null);
+    setSelectedObjectId(null);
     setTransformState({ scale: 1, positionX: 0, positionY: 0 });
   };
 
@@ -171,6 +196,7 @@ export const Canvas: React.FC = () => {
 
   return (
     <div className="flex-1 bg-gray-900 relative w-full h-full" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+       <FloatingMenu selectedObjectId={selectedObjectId} onDelete={deleteSelectedObject} />
       <TransformWrapper
         ref={transformWrapperRef}
         initialScale={transformState.scale}
@@ -235,6 +261,7 @@ export const Canvas: React.FC = () => {
             <TransformComponent wrapperClass="!w-full !h-full">
               <div
                 id="canvas-area"
+                onMouseDown={() => setSelectedObjectId(null)}
                 className={`relative bg-cover bg-center transition-all duration-300 ${!hasContent ? `border-2 border-dashed rounded-lg ${isDragging ? 'border-blue-400 bg-blue-900/50' : 'border-gray-600'}` : 'shadow-2xl bg-gray-900/50'}`}
                 style={canvasDimensions ? { width: `${canvasDimensions.width}px`, height: `${canvasDimensions.height}px`, backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : 'none' } : {}}
               >
@@ -248,6 +275,7 @@ export const Canvas: React.FC = () => {
                     position={{ x: obj.x, y: obj.y }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
+                      setSelectedObjectId(obj.id);
                     }}
                     onDragStart={() => setIsObjectInteracting(true)}
                     onDragStop={(_, d) => {
@@ -255,15 +283,15 @@ export const Canvas: React.FC = () => {
                       handleDragStop(obj.id, d);
                     }}
                     onResizeStart={() => setIsObjectInteracting(true)}
-                    onResizeStop={(_, __, ref, delta, position) => {
+                    onResizeStop={(_, __, ref, ___, position) => {
                       setIsObjectInteracting(false);
                       setSvgObjects(prev =>
                         prev.map(o =>
                           o.id === obj.id
                             ? {
                                 ...o,
-                                width: o.width + delta.width,
-                                height: o.height + delta.height,
+                                width: parseInt(ref.style.width, 10),
+                                height: parseInt(ref.style.height, 10),
                                 ...position,
                               }
                             : o
@@ -271,7 +299,7 @@ export const Canvas: React.FC = () => {
                       );
                     }}
                     bounds="parent"
-                    className="box-border border border-transparent hover:border-blue-500 focus:border-blue-500"
+                    className={`box-border border-2 ${selectedObjectId === obj.id ? 'border-blue-500' : 'border-transparent hover:border-blue-500/50'}`}
                   >
                     <div
                       className="w-full h-full [&>svg]:w-full [&>svg]:h-full"

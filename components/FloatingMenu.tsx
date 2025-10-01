@@ -1,9 +1,14 @@
 
 import React, { useState } from 'react';
 import { Rnd } from 'react-rnd';
-import { MoveIcon, ChevronsRightLeftIcon, MinusIcon } from './icons';
+import { MoveIcon, ChevronsRightLeftIcon, MinusIcon, TrashIcon } from './icons';
 
-export const FloatingMenu: React.FC = () => {
+interface FloatingMenuProps {
+  selectedObjectId: string | null;
+  onDelete: () => void;
+}
+
+export const FloatingMenu: React.FC<FloatingMenuProps> = ({ selectedObjectId, onDelete }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
@@ -38,6 +43,15 @@ export const FloatingMenu: React.FC = () => {
         {!isCollapsed && (
           <div className="p-3">
             <ul className="space-y-2 text-sm">
+                <li
+                  className={`flex items-center gap-2 p-2 rounded ${selectedObjectId ? 'hover:bg-red-800/50 cursor-pointer text-red-300' : 'cursor-not-allowed text-gray-500'}`}
+                  onClick={selectedObjectId ? onDelete : undefined}
+                  aria-disabled={!selectedObjectId}
+                >
+                    <TrashIcon className="w-4 h-4"/>
+                    <span>Delete Selected</span>
+                </li>
+                <hr className="border-gray-600 my-2" />
                 <li className="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">Tool Option 1</li>
                 <li className="flex items-center gap-2 p-2 rounded hover:bg-gray-600/50 cursor-pointer">Tool Option 2</li>
                 <li className="flex items-center gap-2 p-2 rounded bg-blue-600/30 text-blue-200 cursor-pointer">Active Tool</li>
