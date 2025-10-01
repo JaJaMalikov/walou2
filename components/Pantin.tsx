@@ -5,20 +5,41 @@ interface PantinProps {
   object: SvgObject;
 }
 
-const ARTICULABLE_PARTS = [
-    'tete', 'haut_bras_droite', 'avant_bras_droite', 'main_droite',
-    'haut_bras_gauche', 'avant_bras_gauche', 'main_gauche',
-    'cuisse_droite', 'tibia_droite', 'pied_droite',
-    'cuisse_gauche', 'tibia_gauche', 'pied_gauche',
-];
+// Defines the parent-child relationships for rotation calculation
+const PUPPET_HIERARCHY: { [key: string]: string | null } = {
+    'tete': 'cou',
+    'haut_bras_droite': 'epaule_droite',
+    'avant_bras_droite': 'haut_bras_droite',
+    'main_droite': 'avant_bras_droite',
+    'haut_bras_gauche': 'epaule_gauche',
+    'avant_bras_gauche': 'haut_bras_gauche',
+    'main_gauche': 'avant_bras_gauche',
+    'cuisse_droite': 'hanche_droite',
+    'tibia_droite': 'cuisse_droite',
+    'pied_droite': 'tibia_droite',
+    'cuisse_gauche': 'hanche_gauche',
+    'tibia_gauche': 'cuisse_gauche',
+    'pied_gauche': 'tibia_gauche',
+    // Parts without parents in this hierarchy
+    'cou': null, 'epaule_droite': null, 'epaule_gauche': null,
+    'hanche_droite': null, 'hanche_gauche': null,
+};
+
+const ARTICULABLE_PARTS = Object.keys(PUPPET_HIERARCHY).filter(key => PUPPET_HIERARCHY[key] !== undefined);
 
 export const Pantin: React.FC<PantinProps> = ({ object }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  const sendToBack = (el: Element | null) => {
+      if (el && el.parentNode) {
+          el.parentNode.insertBefore(el, el.parentNode.firstChild);
+      }
+  };
 
   const findPivotCoords = (el: SVGElement | null): string | null => {
       if (!el || !el.parentNode) return null;
       const parent = el.parentNode as Element;
-      const pivotCircle = parent.querySelector("circle.pivot") as SVGCircleElement | null;
+      const pivotCircle = parent.querySelector(":scope > circle.pivot") as SVGCircleElement | null;
       if (!pivotCircle) return null;
 
       const cx = parseFloat(pivotCircle.getAttribute("cx") || "");
@@ -28,10 +49,16 @@ export const Pantin: React.FC<PantinProps> = ({ object }) => {
       return `${cx}px ${cy}px`;
   };
 
-  // Effect for initial setup: find pivots and set transform origins
+  // Effect for initial setup: z-ordering, find pivots and set transform origins
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    // Z-order adjustments
+    ["poignet_droite", "poignet_gauche", "hanche_droite", "hanche_gauche"].forEach((id) => {
+        const node = container.querySelector(`#${id}`);
+        if (node) sendToBack(node);
+    });
 
     ARTICULABLE_PARTS.forEach(partId => {
       const el = container.querySelector(`#${partId}`) as SVGElement | null;
@@ -43,21 +70,41 @@ export const Pantin: React.FC<PantinProps> = ({ object }) => {
         }
       }
     });
-  }, [object.content]); // Re-run if the SVG content itself changes
+  }, [object.content]);
 
   // Effect for applying rotations when articulation props change
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !object.articulation) return;
+    if (!container) return;
+    
+    const appliedRotations: { [key: string]: number } = {};
+    const articulationState = object.articulation || {};
 
-    Object.entries(object.articulation).forEach(([partId, angle]) => {
-      const el = container.querySelector(`#${partId}`) as SVGElement | null;
-      if (el) {
-        el.style.transform = `rotate(${angle}deg)`;
-      }
+    const getRotation = (partId: string): number => {
+        return articulationState[partId] || 0;
+    };
+    
+    // Function to calculate final rotation including parents'
+    const getAbsoluteRotation = (partId: string): number => {
+        let totalAngle = 0;
+        let currentPart: string | null = partId;
+        while(currentPart && PUPPET_HIERARCHY[currentPart] !== undefined) {
+            totalAngle += getRotation(currentPart);
+            currentPart = PUPPET_HIERARCHY[currentPart];
+        }
+        return totalAngle;
+    };
+
+    ARTICULABLE_PARTS.forEach(partId => {
+        const el = container.querySelector(`#${partId}`) as SVGElement | null;
+        if (el) {
+            const angle = getRotation(partId);
+            el.style.transform = `rotate(${angle}deg)`;
+        }
     });
 
-  }, [object.articulation]);
+  }, [object.articulation, object.content]);
+  
 
   return (
     <div
