@@ -144,10 +144,6 @@ export const Canvas: React.FC = () => {
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
     setSvgObjects(prev => prev.map(obj => obj.id === id ? { ...obj, x: d.x, y: d.y } : obj));
   };
-  
-  const handleResizeStop = (id: string, ref: HTMLElement, position: { x: number; y: number }) => {
-    setSvgObjects(prev => prev.map(obj => obj.id === id ? { ...obj, width: ref.offsetWidth, height: ref.offsetHeight, ...position } : obj));
-  };
 
   const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }, []);
   const onDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }, []);
@@ -247,17 +243,32 @@ export const Canvas: React.FC = () => {
                 {svgObjects.map(obj => (
                   <Rnd
                     key={obj.id}
+                    scale={transformState.scale}
                     size={{ width: obj.width, height: obj.height }}
                     position={{ x: obj.x, y: obj.y }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                    }}
                     onDragStart={() => setIsObjectInteracting(true)}
                     onDragStop={(_, d) => {
                       setIsObjectInteracting(false);
                       handleDragStop(obj.id, d);
                     }}
                     onResizeStart={() => setIsObjectInteracting(true)}
-                    onResizeStop={(_, __, ref, ___, position) => {
+                    onResizeStop={(_, __, ref, delta, position) => {
                       setIsObjectInteracting(false);
-                      handleResizeStop(obj.id, ref, position)
+                      setSvgObjects(prev =>
+                        prev.map(o =>
+                          o.id === obj.id
+                            ? {
+                                ...o,
+                                width: o.width + delta.width,
+                                height: o.height + delta.height,
+                                ...position,
+                              }
+                            : o
+                        )
+                      );
                     }}
                     bounds="parent"
                     className="box-border border border-transparent hover:border-blue-500 focus:border-blue-500"
