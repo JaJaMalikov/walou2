@@ -44,8 +44,8 @@ export const Canvas: React.FC = () => {
   const [transformState, setTransformState] = useState<CanvasState['transformState'] | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isObjectInteracting, setIsObjectInteracting] = useState(false);
   
-  // FIX: Use a ref on TransformWrapper to get the wrapper component instance, instead of trying to pass an invalid ref via wrapperProps.
   const transformWrapperRef = useRef<any>(null);
 
   useEffect(() => {
@@ -185,27 +185,47 @@ export const Canvas: React.FC = () => {
         limitToBounds={!!canvasDimensions}
         doubleClick={{ disabled: true }}
         centerZoomedOut={true}
+        panning={{ disabled: isObjectInteracting }}
       >
         {({ setTransform }) => (
           <>
             <Controls fitView={() => {
-              // FIX: Get wrapper component from transformWrapperRef to calculate fit-to-view bounds.
               const wrapperComponent = transformWrapperRef.current?.instance.wrapperComponent;
-              if (!wrapperComponent || !canvasDimensions) return;
+              if (!wrapperComponent) return;
 
               const viewRect = wrapperComponent.getBoundingClientRect();
-              const { width: contentWidth, height: contentHeight } = canvasDimensions;
+              
+              let contentBounds = {
+                minX: Infinity, minY: Infinity,
+                maxX: -Infinity, maxY: -Infinity,
+              };
 
+              if (canvasDimensions) {
+                contentBounds = { minX: 0, minY: 0, maxX: canvasDimensions.width, maxY: canvasDimensions.height };
+              } else if (svgObjects.length > 0) {
+                 svgObjects.forEach(obj => {
+                    contentBounds.minX = Math.min(contentBounds.minX, obj.x);
+                    contentBounds.minY = Math.min(contentBounds.minY, obj.y);
+                    contentBounds.maxX = Math.max(contentBounds.maxX, obj.x + obj.width);
+                    contentBounds.maxY = Math.max(contentBounds.maxY, obj.y + obj.height);
+                });
+              } else {
+                return; // No content to fit
+              }
+              
+              const contentWidth = contentBounds.maxX - contentBounds.minX;
+              const contentHeight = contentBounds.maxY - contentBounds.minY;
+              
               if (contentWidth <= 0 || contentHeight <= 0) return;
-
+              
               const marginFactor = 0.9;
-
+              
               const scaleX = viewRect.width / contentWidth;
               const scaleY = viewRect.height / contentHeight;
               const newScale = Math.min(scaleX, scaleY) * marginFactor;
 
-              const newPositionX = (viewRect.width - (contentWidth * newScale)) / 2;
-              const newPositionY = (viewRect.height - (contentHeight * newScale)) / 2;
+              const newPositionX = (viewRect.width - (contentWidth * newScale)) / 2 - (contentBounds.minX * newScale);
+              const newPositionY = (viewRect.height - (contentHeight * newScale)) / 2 - (contentBounds.minY * newScale);
 
               setTransform(newPositionX, newPositionY, newScale, 300, 'easeOut');
             }} />
@@ -216,7 +236,6 @@ export const Canvas: React.FC = () => {
                     </button>
                 )}
             </div>
-            {/* FIX: Removed wrapperProps with invalid `ref` property. The ref is now correctly placed on TransformWrapper. */}
             <TransformComponent wrapperClass="!w-full !h-full">
               <div
                 id="canvas-area"
@@ -230,8 +249,16 @@ export const Canvas: React.FC = () => {
                     key={obj.id}
                     size={{ width: obj.width, height: obj.height }}
                     position={{ x: obj.x, y: obj.y }}
-                    onDragStop={(_, d) => handleDragStop(obj.id, d)}
-                    onResizeStop={(_, __, ref, ___, position) => handleResizeStop(obj.id, ref, position)}
+                    onDragStart={() => setIsObjectInteracting(true)}
+                    onDragStop={(_, d) => {
+                      setIsObjectInteracting(false);
+                      handleDragStop(obj.id, d);
+                    }}
+                    onResizeStart={() => setIsObjectInteracting(true)}
+                    onResizeStop={(_, __, ref, ___, position) => {
+                      setIsObjectInteracting(false);
+                      handleResizeStop(obj.id, ref, position)
+                    }}
                     bounds="parent"
                     className="box-border border border-transparent hover:border-blue-500 focus:border-blue-500"
                   >
