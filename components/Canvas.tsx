@@ -250,16 +250,20 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   }, [processSvg, canvasDimensions, fitView]);
 
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
+    let selectedObject: SvgObject | null = null;
     setSvgObjects(prev =>
       prev.map(obj => {
         if (obj.id === id) {
           const updatedObj = { ...obj, x: d.x, y: d.y };
-          onObjectSelect(updatedObj);
+          selectedObject = updatedObj;
           return updatedObj;
         }
         return obj;
       })
     );
+    if(selectedObject) {
+      onObjectSelect(selectedObject);
+    }
   };
 
   const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }, []);
@@ -369,8 +373,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     onResizeStart={() => setIsObjectInteracting(true)}
                     onResizeStop={(_, __, ref, ___, position) => {
                       setIsObjectInteracting(false);
+                      let selectedObject: SvgObject | null = null;
                       setSvgObjects(prev => {
-                        const newObjects = prev.map(o => {
+                        return prev.map(o => {
                           if (o.id === obj.id) {
                             const updatedObj = {
                               ...o,
@@ -378,13 +383,15 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                               height: parseInt(ref.style.height, 10),
                               ...position,
                             };
-                            onObjectSelect(updatedObj);
+                            selectedObject = updatedObj;
                             return updatedObj;
                           }
                           return o;
                         });
-                        return newObjects;
                       });
+                      if (selectedObject) {
+                          onObjectSelect(selectedObject);
+                      }
                     }}
                     bounds="parent"
                     className={`box-border border-2 ${selectedObjectId === obj.id ? 'border-blue-500' : 'border-transparent hover:border-blue-500/50'}`}
