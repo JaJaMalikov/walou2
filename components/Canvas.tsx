@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Rnd } from 'react-rnd';
-import { ZoomInIcon, ZoomOutIcon, ExpandIcon, UploadCloudIcon, TrashIcon, FitToScreenIcon } from './icons';
+import { UploadCloudIcon, TrashIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
 import type { CanvasRef } from '../types';
 
@@ -33,24 +33,24 @@ interface CanvasState {
   menuState?: MenuState;
 }
 
-const Controls = ({ fitView }: { fitView: () => void }) => {
-    const { zoomIn, zoomOut, resetTransform } = useControls();
-    return (
-        <div className="absolute bottom-4 right-4 z-10 flex gap-2">
-            <button onClick={() => zoomIn()} className="p-2 bg-gray-700/50 backdrop-blur-sm rounded-md hover:bg-gray-600/70 transition-colors" aria-label="Zoom In"><ZoomInIcon/></button>
-            <button onClick={() => zoomOut()} className="p-2 bg-gray-700/50 backdrop-blur-sm rounded-md hover:bg-gray-600/70 transition-colors" aria-label="Zoom Out"><ZoomOutIcon/></button>
-            <button onClick={() => resetTransform()} className="p-2 bg-gray-700/50 backdrop-blur-sm rounded-md hover:bg-gray-600/70 transition-colors" aria-label="Reset Transform"><ExpandIcon/></button>
-            <button onClick={fitView} className="p-2 bg-gray-700/50 backdrop-blur-sm rounded-md hover:bg-gray-600/70 transition-colors" aria-label="Fit to Screen"><FitToScreenIcon /></button>
-        </div>
-    );
-};
+interface CanvasProps {
+  leftPanelOpen: boolean;
+  rightPanelOpen: boolean;
+  dockOpen: boolean;
+  onToggleLeftPanel: () => void;
+  onToggleRightPanel: () => void;
+  onToggleDock: () => void;
+}
 
-export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
+export const Canvas = forwardRef<CanvasRef, CanvasProps>(({ 
+  leftPanelOpen, rightPanelOpen, dockOpen,
+  onToggleLeftPanel, onToggleRightPanel, onToggleDock 
+}, ref) => {
   const [svgObjects, setSvgObjects] = useState<SvgObject[]>([]);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState<{width: number, height: number} | null>(null);
   const [transformState, setTransformState] = useState<CanvasState['transformState'] | null>(null);
-  const [menuState, setMenuState] = useState<MenuState>({ x: 50, y: 80, width: 220, height: 52 });
+  const [menuState, setMenuState] = useState<MenuState>({ x: 50, y: 80, width: 420, height: 52 });
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isObjectInteracting, setIsObjectInteracting] = useState(false);
@@ -67,7 +67,7 @@ export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
         setBackgroundImageUrl(savedState.backgroundImageUrl || null);
         setCanvasDimensions(savedState.canvasDimensions || null);
         setTransformState(savedState.transformState || { scale: 1, positionX: 0, positionY: 0 });
-        setMenuState(savedState.menuState || { x: 50, y: 80, width: 220, height: 52 });
+        setMenuState(savedState.menuState || { x: 50, y: 80, width: 420, height: 52 });
       } else {
         setTransformState({ scale: 1, positionX: 0, positionY: 0 });
       }
@@ -135,6 +135,50 @@ export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
     return { width: 200, height: 200 }; // Fallback
   };
   
+  const fitView = useCallback(() => {
+    const instance = transformWrapperRef.current?.instance;
+    if (!instance) return;
+
+    const { setTransform, wrapperComponent } = instance;
+    if (!wrapperComponent) return;
+
+    const viewRect = wrapperComponent.getBoundingClientRect();
+    
+    let contentBounds = {
+      minX: Infinity, minY: Infinity,
+      maxX: -Infinity, maxY: -Infinity,
+    };
+
+    if (canvasDimensions) {
+      contentBounds = { minX: 0, minY: 0, maxX: canvasDimensions.width, maxY: canvasDimensions.height };
+    } else if (svgObjects.length > 0) {
+        svgObjects.forEach(obj => {
+          contentBounds.minX = Math.min(contentBounds.minX, obj.x);
+          contentBounds.minY = Math.min(contentBounds.minY, obj.y);
+          contentBounds.maxX = Math.max(contentBounds.maxX, obj.x + obj.width);
+          contentBounds.maxY = Math.max(contentBounds.maxY, obj.y + obj.height);
+      });
+    } else {
+      return; // No content to fit
+    }
+    
+    const contentWidth = contentBounds.maxX - contentBounds.minX;
+    const contentHeight = contentBounds.maxY - contentBounds.minY;
+    
+    if (contentWidth <= 0 || contentHeight <= 0) return;
+    
+    const marginFactor = 0.9;
+    
+    const scaleX = viewRect.width / contentWidth;
+    const scaleY = viewRect.height / contentHeight;
+    const newScale = Math.min(scaleX, scaleY) * marginFactor;
+
+    const newPositionX = (viewRect.width - (contentWidth * newScale)) / 2 - (contentBounds.minX * newScale);
+    const newPositionY = (viewRect.height - (contentHeight * newScale)) / 2 - (contentBounds.minY * newScale);
+
+    setTransform(newPositionX, newPositionY, newScale, 300, 'easeOut');
+  }, [canvasDimensions, svgObjects]);
+
   useImperativeHandle(ref, () => ({
     addObject: (svgContent: string) => {
       const wrapperComponent = transformWrapperRef.current?.instance.wrapperComponent;
@@ -143,7 +187,6 @@ export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
       const viewRect = wrapperComponent.getBoundingClientRect();
       const dimensions = getSvgDimensions(svgContent);
 
-      // Calculate center of the viewport in canvas coordinates
       const centerX = (viewRect.width / 2 - transformState.positionX) / transformState.scale;
       const centerY = (viewRect.height / 2 - transformState.positionY) / transformState.scale;
 
@@ -155,27 +198,34 @@ export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
         ...dimensions,
       };
       setSvgObjects(prev => [...prev, newSvg]);
-    }
+    },
+    setBackground: (imageUrl: string) => {
+      setError(null);
+      const img = new Image();
+      img.onload = () => {
+        setBackgroundImageUrl(imageUrl);
+        setCanvasDimensions({ width: img.naturalWidth, height: img.naturalHeight });
+        setTimeout(fitView, 100);
+      };
+      img.onerror = () => {
+        setError("Failed to load the background image.");
+      };
+      img.src = imageUrl;
+    },
+    fitView: fitView,
   }));
 
   const handleFileDrop = useCallback((file: File) => {
     setError(null);
-    if (file.type === 'image/png') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
+    const fileUrl = URL.createObjectURL(file);
+    if (file.type.startsWith('image/png')) {
         const img = new Image();
         img.onload = () => {
-          if (!backgroundImageUrl) {
-            setBackgroundImageUrl(dataUrl);
+            setBackgroundImageUrl(fileUrl);
             setCanvasDimensions({ width: img.naturalWidth, height: img.naturalHeight });
-          } else {
-            setError("Please reset the canvas to add a new background.");
-          }
+            setTimeout(fitView, 100);
         };
-        img.src = dataUrl;
-      };
-      reader.readAsDataURL(file);
+        img.src = fileUrl;
     } else if (file.type === 'image/svg+xml') {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -193,8 +243,9 @@ export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
       reader.readAsText(file);
     } else {
       setError('Invalid file type. Please drop a PNG or SVG file.');
+       URL.revokeObjectURL(fileUrl);
     }
-  }, [processSvg, backgroundImageUrl, canvasDimensions]);
+  }, [processSvg, canvasDimensions, fitView]);
 
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
     setSvgObjects(prev => prev.map(obj => obj.id === id ? { ...obj, x: d.x, y: d.y } : obj));
@@ -218,7 +269,9 @@ export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
     setCanvasDimensions(null);
     setError(null);
     setSelectedObjectId(null);
-    setTransformState({ scale: 1, positionX: 0, positionY: 0 });
+    if (transformWrapperRef.current) {
+        transformWrapperRef.current.instance.resetTransform();
+    }
   };
 
   const handleMenuChange = (updates: Partial<MenuState>) => {
@@ -235,7 +288,17 @@ export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
         menuState={menuState}
         onMenuChange={handleMenuChange}
         selectedObjectId={selectedObjectId} 
-        onDelete={deleteSelectedObject} 
+        onDelete={deleteSelectedObject}
+        leftPanelOpen={leftPanelOpen}
+        rightPanelOpen={rightPanelOpen}
+        dockOpen={dockOpen}
+        onToggleLeftPanel={onToggleLeftPanel}
+        onToggleRightPanel={onToggleRightPanel}
+        onToggleDock={onToggleDock}
+        onFitView={fitView}
+        onZoomIn={() => transformWrapperRef.current?.instance.zoomIn()}
+        onZoomOut={() => transformWrapperRef.current?.instance.zoomOut()}
+        onResetTransform={() => transformWrapperRef.current?.instance.resetTransform()}
       />
       <TransformWrapper
         ref={transformWrapperRef}
@@ -249,48 +312,7 @@ export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
         centerZoomedOut={true}
         panning={{ disabled: isObjectInteracting }}
       >
-        {({ setTransform }) => (
-          <>
-            <Controls fitView={() => {
-              const wrapperComponent = transformWrapperRef.current?.instance.wrapperComponent;
-              if (!wrapperComponent) return;
-
-              const viewRect = wrapperComponent.getBoundingClientRect();
-              
-              let contentBounds = {
-                minX: Infinity, minY: Infinity,
-                maxX: -Infinity, maxY: -Infinity,
-              };
-
-              if (canvasDimensions) {
-                contentBounds = { minX: 0, minY: 0, maxX: canvasDimensions.width, maxY: canvasDimensions.height };
-              } else if (svgObjects.length > 0) {
-                 svgObjects.forEach(obj => {
-                    contentBounds.minX = Math.min(contentBounds.minX, obj.x);
-                    contentBounds.minY = Math.min(contentBounds.minY, obj.y);
-                    contentBounds.maxX = Math.max(contentBounds.maxX, obj.x + obj.width);
-                    contentBounds.maxY = Math.max(contentBounds.maxY, obj.y + obj.height);
-                });
-              } else {
-                return; // No content to fit
-              }
-              
-              const contentWidth = contentBounds.maxX - contentBounds.minX;
-              const contentHeight = contentBounds.maxY - contentBounds.minY;
-              
-              if (contentWidth <= 0 || contentHeight <= 0) return;
-              
-              const marginFactor = 0.9;
-              
-              const scaleX = viewRect.width / contentWidth;
-              const scaleY = viewRect.height / contentHeight;
-              const newScale = Math.min(scaleX, scaleY) * marginFactor;
-
-              const newPositionX = (viewRect.width - (contentWidth * newScale)) / 2 - (contentBounds.minX * newScale);
-              const newPositionY = (viewRect.height - (contentHeight * newScale)) / 2 - (contentBounds.minY * newScale);
-
-              setTransform(newPositionX, newPositionY, newScale, 300, 'easeOut');
-            }} />
+        <>
             <div className="absolute top-4 right-4 z-10 flex gap-2">
                 {hasContent && (
                      <button onClick={resetCanvas} className="p-2 bg-red-800/50 backdrop-blur-sm rounded-md hover:bg-red-700/70 transition-colors" aria-label="Reset Canvas">
@@ -358,7 +380,6 @@ export const Canvas = forwardRef<CanvasRef, {}>((props, ref) => {
               </div>
             </TransformComponent>
           </>
-        )}
       </TransformWrapper>
       {isDragging && (
         <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm flex flex-col items-center justify-center z-20 pointer-events-none transition-opacity duration-300" aria-hidden="true">

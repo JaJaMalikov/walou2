@@ -4,8 +4,13 @@ import { UserIcon, ShapesIcon, ImageIcon } from './icons';
 
 interface AssetPanelProps {
   onAddObject: (svgContent: string) => void;
+  onSetBackground: (imageUrl: string) => void;
 }
 
+// NOTE: Add any new assets to this list.
+// For .png files in 'decors', ensure the path is correct.
+// For demonstration, you could add:
+// { name: 'forest', path: '/assets/decors/forest.png', category: 'decors' },
 const initialAssets: Asset[] = [
   { name: 'bab_manu', path: '/assets/pantins/bab_manu.svg', category: 'pantins' },
   { name: 'lunettes_manu', path: '/assets/objets/lunettes_manu.svg', category: 'objets' },
@@ -22,7 +27,7 @@ const categoryNames: Record<AssetCategory, string> = {
   decors: 'Décors',
 };
 
-export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject }) => {
+export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackground }) => {
   const [assets, setAssets] = useState<Asset[]>(initialAssets);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AssetCategory>('pantins');
@@ -33,13 +38,16 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject }) => {
       try {
         const loadedAssets = await Promise.all(
           initialAssets.map(async (asset) => {
-            const response = await fetch(asset.path);
-            if (!response.ok) {
-              console.error(`Failed to fetch ${asset.path}`);
-              return { ...asset, content: undefined };
+            if (asset.path.endsWith('.svg')) {
+              const response = await fetch(asset.path);
+              if (!response.ok) {
+                console.error(`Failed to fetch ${asset.path}`);
+                return { ...asset, content: undefined };
+              }
+              const content = await response.text();
+              return { ...asset, content };
             }
-            const content = await response.text();
-            return { ...asset, content };
+            return asset; // For PNGs, just return the asset with its path
           })
         );
         setAssets(loadedAssets);
@@ -54,7 +62,7 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject }) => {
   }, []);
 
   const visibleAssets = assets.filter(
-    (asset) => asset.category === activeTab && asset.content
+    (asset) => asset.category === activeTab
   );
 
   return (
@@ -91,14 +99,24 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject }) => {
                 visibleAssets.map((asset) => (
                   <button
                     key={asset.name}
-                    onClick={() => onAddObject(asset.content!)}
+                    onClick={() => {
+                        if (asset.category === 'decors') {
+                            onSetBackground(asset.path);
+                        } else if (asset.content) {
+                            onAddObject(asset.content);
+                        }
+                    }}
                     className="aspect-square bg-gray-700 rounded-md p-2 flex items-center justify-center hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                     title={`Add ${asset.name}`}
                   >
-                    <div
-                      className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:object-contain"
-                      dangerouslySetInnerHTML={{ __html: asset.content! }}
-                    />
+                    {asset.category === 'decors' ? (
+                        <img src={asset.path} alt={asset.name} className="w-full h-full object-contain"/>
+                    ) : (
+                        <div
+                        className="w-full h-full [&>svg]:w-full [&>svg]:h-full [&>svg]:object-contain"
+                        dangerouslySetInnerHTML={{ __html: asset.content || '' }}
+                        />
+                    )}
                   </button>
                 ))
             ) : (
