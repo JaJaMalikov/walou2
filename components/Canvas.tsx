@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { TransformWrapper, TransformComponent, useControls } from 'react-zoom-pan-pinch';
 import { Rnd } from 'react-rnd';
 import { ZoomInIcon, ZoomOutIcon, ExpandIcon, UploadCloudIcon, TrashIcon, FitToScreenIcon } from './icons';
@@ -44,6 +44,9 @@ export const Canvas: React.FC = () => {
   const [transformState, setTransformState] = useState<CanvasState['transformState'] | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // FIX: Use a ref on TransformWrapper to get the wrapper component instance, instead of trying to pass an invalid ref via wrapperProps.
+  const transformWrapperRef = useRef<any>(null);
 
   useEffect(() => {
     try {
@@ -173,6 +176,7 @@ export const Canvas: React.FC = () => {
   return (
     <div className="flex-1 bg-gray-900 relative w-full h-full" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
       <TransformWrapper
+        ref={transformWrapperRef}
         initialScale={transformState.scale}
         initialPositionX={transformState.positionX}
         initialPositionY={transformState.positionY}
@@ -182,9 +186,29 @@ export const Canvas: React.FC = () => {
         doubleClick={{ disabled: true }}
         centerZoomedOut={true}
       >
-        {({ zoomToElement }) => (
+        {({ setTransform }) => (
           <>
-            <Controls fitView={() => canvasDimensions && zoomToElement('canvas-area', 0.9)} />
+            <Controls fitView={() => {
+              // FIX: Get wrapper component from transformWrapperRef to calculate fit-to-view bounds.
+              const wrapperComponent = transformWrapperRef.current?.instance.wrapperComponent;
+              if (!wrapperComponent || !canvasDimensions) return;
+
+              const viewRect = wrapperComponent.getBoundingClientRect();
+              const { width: contentWidth, height: contentHeight } = canvasDimensions;
+
+              if (contentWidth <= 0 || contentHeight <= 0) return;
+
+              const marginFactor = 0.9;
+
+              const scaleX = viewRect.width / contentWidth;
+              const scaleY = viewRect.height / contentHeight;
+              const newScale = Math.min(scaleX, scaleY) * marginFactor;
+
+              const newPositionX = (viewRect.width - (contentWidth * newScale)) / 2;
+              const newPositionY = (viewRect.height - (contentHeight * newScale)) / 2;
+
+              setTransform(newPositionX, newPositionY, newScale, 300, 'easeOut');
+            }} />
             <div className="absolute top-4 right-4 z-10 flex gap-2">
                 {hasContent && (
                      <button onClick={resetCanvas} className="p-2 bg-red-800/50 backdrop-blur-sm rounded-md hover:bg-red-700/70 transition-colors" aria-label="Reset Canvas">
@@ -192,6 +216,7 @@ export const Canvas: React.FC = () => {
                     </button>
                 )}
             </div>
+            {/* FIX: Removed wrapperProps with invalid `ref` property. The ref is now correctly placed on TransformWrapper. */}
             <TransformComponent wrapperClass="!w-full !h-full">
               <div
                 id="canvas-area"
