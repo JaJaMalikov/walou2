@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Asset, AssetCategory } from '../types';
 import { UserIcon, ShapesIcon, ImageIcon } from './icons';
@@ -6,16 +7,6 @@ interface AssetPanelProps {
   onAddObject: (svgContent: string, category: AssetCategory) => void;
   onSetBackground: (imageUrl: string) => void;
 }
-
-// NOTE: Add any new assets to this list.
-// For .png files in 'decors', ensure the path is correct.
-// For demonstration, you could add:
-// { name: 'forest', path: '/assets/decors/forest.png', category: 'decors' },
-const initialAssets: Asset[] = [
-  { name: 'Manu', path: '/assets/pantins/bab_manu.svg', category: 'pantins' },
-  { name: 'Lunettes Manu', path: '/assets/objets/lunettes_manu.svg', category: 'objets' },
-  { name: 'Bureau', path: '/assets/decors/bureau.png', category: 'decors' },
-];
 
 const categoryIcons: Record<AssetCategory, React.ElementType> = {
   pantins: UserIcon,
@@ -29,7 +20,7 @@ const categoryNames: Record<AssetCategory, string> = {
 };
 
 export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackground }) => {
-  const [assets, setAssets] = useState<Asset[]>(initialAssets);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AssetCategory>('pantins');
 
@@ -37,18 +28,30 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
     const fetchAssets = async () => {
       setIsLoading(true);
       try {
+        const manifestResponse = await fetch('/assets-manifest.json');
+        if (!manifestResponse.ok) {
+          throw new Error('Failed to fetch asset manifest');
+        }
+        const manifestAssets: Omit<Asset, 'content'>[] = await manifestResponse.json();
+
         const loadedAssets = await Promise.all(
-          initialAssets.map(async (asset) => {
+          manifestAssets.map(async (asset) => {
             if (asset.path.endsWith('.svg')) {
-              const response = await fetch(asset.path);
-              if (!response.ok) {
-                console.error(`Failed to fetch ${asset.path}`);
-                return { ...asset, content: undefined };
+              try {
+                const response = await fetch(asset.path);
+                if (!response.ok) {
+                  console.error(`Failed to fetch ${asset.path}`);
+                  return { ...asset, content: undefined };
+                }
+                const content = await response.text();
+                return { ...asset, content };
+              } catch (svgError) {
+                 console.error(`Error fetching SVG content for ${asset.name}:`, svgError);
+                 return { ...asset, content: undefined };
               }
-              const content = await response.text();
-              return { ...asset, content };
             }
-            return asset; // For PNGs, just return the asset with its path
+            // For non-SVG files like PNGs, just return the asset with its path
+            return asset;
           })
         );
         setAssets(loadedAssets);
@@ -107,10 +110,10 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
                     title={`Add ${asset.name}`}
                   >
                     <div className="asset-item-thumbnail">
-                        {asset.category === 'decors' ? (
-                            <img src={asset.path} alt={asset.name} />
+                        {asset.path.endsWith('.svg') ? (
+                             <img src={asset.path} alt={asset.name} />
                         ) : (
-                            <img src={asset.path} alt={asset.name} />
+                             <img src={asset.path} alt={asset.name} />
                         )}
                     </div>
                   </button>
