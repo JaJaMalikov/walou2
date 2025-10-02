@@ -15,6 +15,8 @@ function scanDir(dir) {
     if (stats.isDirectory()) {
       results = results.concat(scanDir(fullPath));
     } else {
+      if (extname(fullPath).toLowerCase() === ".json") continue;
+
       // Ex : "./assets/objets/lunettes_manu.svg" → "objets"
       const relativePath = relative(ASSETS_DIR, fullPath);
       const [category, filename] = relativePath.split(/[/\\]/);
