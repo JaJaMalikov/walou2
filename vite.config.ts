@@ -4,9 +4,8 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
-    base: process.env.REPO_NAME ? `/${process.env.REPO_NAME}/` : '/',
-
     return {
+      base: process.env.REPO_NAME ? `/${process.env.REPO_NAME}/` : '/',
       server: {
         port: 3000,
         host: '0.0.0.0',
