@@ -8,7 +8,9 @@ import {
   ZoomOutIcon, 
   PanelLeftIcon,
   PanelRightIcon,
-  RowsIcon
+  RowsIcon,
+  PointerIcon,
+  RotateCwIcon
 } from './icons';
 
 interface MenuState {
@@ -33,13 +35,16 @@ interface FloatingMenuProps {
   onZoomIn: () => void;
   onZoomOut: () => void;
   zoomPercent?: number;
+  interactionMode: 'select' | 'rotate';
+  onChangeInteractionMode: (mode: 'select' | 'rotate') => void;
 }
 
 export const FloatingMenu: React.FC<FloatingMenuProps> = ({ 
   menuState, onMenuChange, selectedObjectId, onDelete,
   leftPanelOpen, rightPanelOpen, dockOpen,
   onToggleLeftPanel, onToggleRightPanel, onToggleDock,
-  onFitView, onZoomIn, onZoomOut, zoomPercent
+  onFitView, onZoomIn, onZoomOut, zoomPercent,
+  interactionMode, onChangeInteractionMode
 }) => {
   return (
     <Rnd
@@ -65,6 +70,23 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
         </button>
         <div className="menu-divider"></div>
         <div className="menu-buttons">
+            <button
+                title="Select/Move Mode"
+                aria-label="Select Mode"
+                onClick={() => onChangeInteractionMode('select')}
+                className={`menu-button ${interactionMode === 'select' ? 'active' : ''}`}
+            >
+                <PointerIcon />
+            </button>
+            <button
+                title="Rotate Mode"
+                aria-label="Rotate Mode"
+                onClick={() => onChangeInteractionMode('rotate')}
+                className={`menu-button ${interactionMode === 'rotate' ? 'active' : ''}`}
+            >
+                <RotateCwIcon />
+            </button>
+            <div className="menu-divider"></div>
             <button
                 title="Delete Selected (Del)"
                 aria-label="Delete Selected"

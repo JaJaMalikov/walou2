@@ -49,6 +49,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   const [error, setError] = useState<string | null>(null);
   const [isObjectInteracting, setIsObjectInteracting] = useState(false);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
+  const [interactionMode, setInteractionMode] = useState<'select' | 'rotate'>('select');
   
   const transformWrapperRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -304,6 +305,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         onZoomIn={() => transformWrapperRef.current?.zoomIn()}
         onZoomOut={() => transformWrapperRef.current?.zoomOut()}
         zoomPercent={Math.round(transformState.scale * 100)}
+        interactionMode={interactionMode}
+        onChangeInteractionMode={setInteractionMode}
       />
       <TransformWrapper
         ref={transformWrapperRef}
@@ -341,6 +344,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     scale={transformState.scale}
                     size={{ width: obj.width, height: obj.height }}
                     position={{ x: obj.x, y: obj.y }}
+                    disableDragging={interactionMode === 'rotate'}
+                    enableResizing={interactionMode !== 'rotate'}
                     onMouseDown={(e) => {
                       e.stopPropagation();
                       handleSelectObject(obj);
@@ -365,9 +370,21 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     bounds="parent"
                     className={`resizable-object ${selectedObjectId === obj.id ? 'selected' : ''}`}
                   >
-                   <div style={{ width: '100%', height: '100%', transform: obj.flipped ? 'scaleX(-1)' : 'none' }}>
+                   <div style={{ width: '100%', height: '100%' }}>
                     {obj.category === 'pantins' ? (
-                        <Pantin object={obj} />
+                        <Pantin 
+                          object={obj} 
+                          rotateMode={interactionMode === 'rotate'}
+                          onInteractionStart={() => setIsObjectInteracting(true)}
+                          onInteractionEnd={() => setIsObjectInteracting(false)}
+                          onArticulationChange={(partName, angle) => {
+                            setSvgObjects(prev => prev.map(o => {
+                              if (o.id !== obj.id) return o;
+                              const articulation = { ...(o.articulation || {}), [partName]: angle };
+                              return { ...o, articulation };
+                            }));
+                          }}
+                        />
                       ) : (
                         <div
                           className="pantin-container"

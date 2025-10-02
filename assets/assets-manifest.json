@@ -30,6 +30,11 @@
     "category": "objets"
   },
   {
+    "name": "Manu",
+    "path": "/pantins/Manu.svg",
+    "category": "pantins"
+  },
+  {
     "name": "Bab manu",
     "path": "/pantins/bab_manu.svg",
     "category": "pantins"

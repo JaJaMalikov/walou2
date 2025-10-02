@@ -59,3 +59,16 @@ export const ImageIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
         <polyline points="21 15 16 10 5 21"/>
     </svg>
 );
+
+export const PointerIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M3 3l7 17 2-7 7-2-16-8z"/>
+  </svg>
+);
+
+export const RotateCwIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <polyline points="23 4 23 10 17 10"/>
+    <path d="M20.49 15A9 9 0 1 1 23 10"/>
+  </svg>
+);
