@@ -58,49 +58,49 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
       minHeight={52}
       bounds="parent"
       dragHandleClassName="drag-handle"
-      className="z-20"
+      className="floating-menu-rnd"
     >
-      <div className="bg-gray-700/60 backdrop-blur-lg rounded-lg shadow-2xl h-full w-full flex items-center p-1 border border-gray-500/50" role="toolbar">
-        <button className="drag-handle cursor-move p-2 text-gray-400 hover:text-white flex-shrink-0 rounded-full" aria-label="Move toolbar">
+      <div className="floating-menu-content" role="toolbar">
+        <button className="drag-handle" aria-label="Move toolbar">
           <MoveIcon className="w-5 h-5" />
         </button>
-        <div className="w-px h-6 bg-gray-500/50 mx-1 flex-shrink-0"></div>
-        <div className="flex items-center gap-1 px-1 flex-wrap">
+        <div className="menu-divider"></div>
+        <div className="menu-buttons">
             <button
                 title="Delete Selected (Del)"
                 aria-label="Delete Selected"
                 onClick={selectedObjectId ? onDelete : undefined}
                 disabled={!selectedObjectId}
-                className="p-2 rounded-full transition-colors enabled:hover:bg-red-800/50 disabled:cursor-not-allowed disabled:text-gray-500 enabled:text-red-300"
+                className="menu-button delete-button"
             >
                 <TrashIcon className="w-5 h-5"/>
             </button>
-            <div className="w-px h-6 bg-gray-500/50 mx-1 flex-shrink-0"></div>
+            <div className="menu-divider"></div>
              <button
                 title="Fit to Screen (Ctrl+F)"
                 aria-label="Fit to Screen"
                 onClick={onFitView}
-                className="p-2 rounded-full text-gray-300 transition-colors hover:bg-gray-600/50 hover:text-white"
+                className="menu-button"
             >
                 <FitToScreenIcon className="w-5 h-5" />
             </button>
-            <button title="Zoom In" onClick={onZoomIn} className="p-2 rounded-full text-gray-300 transition-colors hover:bg-gray-600/50 hover:text-white">
+            <button title="Zoom In" onClick={onZoomIn} className="menu-button">
                 <ZoomInIcon className="w-5 h-5" />
             </button>
-            <button title="Zoom Out" onClick={onZoomOut} className="p-2 rounded-full text-gray-300 transition-colors hover:bg-gray-600/50 hover:text-white">
+            <button title="Zoom Out" onClick={onZoomOut} className="menu-button">
                 <ZoomOutIcon className="w-5 h-5" />
             </button>
-            <button title="Reset Transform" onClick={onResetTransform} className="p-2 rounded-full text-gray-300 transition-colors hover:bg-gray-600/50 hover:text-white">
+            <button title="Reset Transform" onClick={onResetTransform} className="menu-button">
                 <ExpandIcon className="w-5 h-5" />
             </button>
-            <div className="w-px h-6 bg-gray-500/50 mx-1 flex-shrink-0"></div>
-             <button title="Toggle Left Panel (Ctrl+L)" aria-label="Toggle Left Panel" onClick={onToggleLeftPanel} className={`p-2 rounded-full transition-colors hover:bg-gray-600/50 ${leftPanelOpen ? 'text-blue-400 hover:text-blue-300' : 'text-gray-300 hover:text-white'}`}>
+            <div className="menu-divider"></div>
+             <button title="Toggle Left Panel (Ctrl+L)" aria-label="Toggle Left Panel" onClick={onToggleLeftPanel} className={`menu-button ${leftPanelOpen ? 'active' : ''}`}>
                 <PanelLeftIcon className="w-5 h-5" />
             </button>
-            <button title="Toggle Right Panel (Ctrl+P)" aria-label="Toggle Right Panel" onClick={onToggleRightPanel} className={`p-2 rounded-full transition-colors hover:bg-gray-600/50 ${rightPanelOpen ? 'text-blue-400 hover:text-blue-300' : 'text-gray-300 hover:text-white'}`}>
+            <button title="Toggle Right Panel (Ctrl+P)" aria-label="Toggle Right Panel" onClick={onToggleRightPanel} className={`menu-button ${rightPanelOpen ? 'active' : ''}`}>
                 <PanelRightIcon className="w-5 h-5" />
             </button>
-             <button title="Toggle Dock (Ctrl+T)" aria-label="Toggle Dock" onClick={onToggleDock} className={`p-2 rounded-full transition-colors hover:bg-gray-600/50 ${dockOpen ? 'text-blue-400 hover:text-blue-300' : 'text-gray-300 hover:text-white'}`}>
+             <button title="Toggle Dock (Ctrl+T)" aria-label="Toggle Dock" onClick={onToggleDock} className={`menu-button ${dockOpen ? 'active' : ''}`}>
                 <RowsIcon className="w-5 h-5" />
             </button>
         </div>

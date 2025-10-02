@@ -297,10 +297,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
   const hasContent = svgObjects.length > 0 || backgroundImageUrl;
   
-  if (!transformState) return <div className="flex-1 bg-gray-900 relative w-full h-full" />;
+  if (!transformState) return <div className="canvas-container" />;
 
   return (
-    <div className="flex-1 bg-gray-900 relative w-full h-full" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+    <div className="canvas-container" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
        <FloatingMenu 
         menuState={menuState}
         onMenuChange={handleMenuChange}
@@ -330,9 +330,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         panning={{ disabled: isObjectInteracting }}
       >
         <>
-            <div className="absolute top-4 right-4 z-10 flex gap-2">
+            <div className="reset-button-container">
                 {hasContent && (
-                     <button onClick={resetCanvas} className="p-2 bg-red-800/50 backdrop-blur-sm rounded-md hover:bg-red-700/70 transition-colors" aria-label="Reset Canvas">
+                     <button onClick={resetCanvas} className="reset-button" aria-label="Reset Canvas">
                         <TrashIcon />
                     </button>
                 )}
@@ -341,10 +341,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
               <div
                 id="canvas-area"
                 onMouseDown={handleDeselect}
-                className={`relative bg-cover bg-center transition-all duration-300 ${!hasContent ? `border-2 border-dashed rounded-lg ${isDragging ? 'border-blue-400 bg-blue-900/50' : 'border-gray-600'}` : 'shadow-2xl bg-gray-900/50'}`}
+                className={`canvas-area ${!hasContent ? 'empty' : ''} ${isDragging ? 'dragging' : ''}`}
                 style={canvasDimensions ? { width: `${canvasDimensions.width}px`, height: `${canvasDimensions.height}px`, backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : 'none' } : {}}
               >
-                {!canvasDimensions && <div className="w-[60vw] h-[60vh]"></div>}
+                {!canvasDimensions && <div style={{width: '60vw', height: '60vh'}}></div>}
                 
                 {svgObjects.map(obj => (
                   <Rnd
@@ -374,24 +374,25 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                         }));
                     }}
                     bounds="parent"
-                    className={`box-border border-2 ${selectedObjectId === obj.id ? 'border-blue-500' : 'border-transparent hover:border-blue-500/50'}`}
+                    className={`resizable-object ${selectedObjectId === obj.id ? 'selected' : ''}`}
                   >
                    {obj.category === 'pantins' ? (
                       <Pantin object={obj} />
                     ) : (
                        <div
-                        className="w-full h-full [&>svg]:w-full [&>svg]:h-full"
-                        dangerouslySetInnerHTML={{ __html: obj.content }}
+                        className="w-full h-full"
+                        style={{'--svg-width': '100%', '--svg-height': '100%'} as any}
+                        dangerouslySetInnerHTML={{ __html: obj.content.replace(/<svg[^>]*>/, '$& style="width: var(--svg-width); height: var(--svg-height);"') }}
                       />
                     )}
                   </Rnd>
                 ))}
 
                 {!hasContent && (
-                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                        <h3 className="text-xl font-semibold text-gray-300">Drop PNG background or SVG file</h3>
-                        <p className="text-gray-500 mt-2">The first PNG will set the canvas size</p>
-                        {error && <p className="text-red-500 mt-4">{error}</p>}
+                     <div className="canvas-placeholder">
+                        <h3>Drop PNG background or SVG file</h3>
+                        <p>The first PNG will set the canvas size</p>
+                        {error && <p className="error">{error}</p>}
                      </div>
                 )}
               </div>
@@ -399,9 +400,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
           </>
       </TransformWrapper>
       {isDragging && (
-        <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm flex flex-col items-center justify-center z-20 pointer-events-none transition-opacity duration-300" aria-hidden="true">
-          <UploadCloudIcon className="w-20 h-20 text-blue-400 animate-pulse mb-4" />
-          <p className="text-2xl font-bold tracking-wide text-gray-100">Drop your PNG or SVG file</p>
+        <div className="drop-overlay" aria-hidden="true">
+          <UploadCloudIcon style={{width: '5rem', height: '5rem', color: '#60a5fa', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />
+          <p>Drop your PNG or SVG file</p>
         </div>
       )}
     </div>

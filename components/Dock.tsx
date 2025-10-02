@@ -9,10 +9,10 @@ interface DockProps {
 export const Dock: React.FC<DockProps> = ({ height, children }) => {
   return (
     <footer
-      className="bg-gray-800 border-t border-gray-700 flex-shrink-0 overflow-hidden transition-all duration-300 ease-in-out"
+      className="dock-container"
       style={{ height: `${height}px` }}
     >
-        <div className="h-full overflow-auto">
+        <div className="dock-content">
             {children}
         </div>
     </footer>

@@ -151,15 +151,15 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-800 overflow-hidden">
-      <main className="flex-1 flex flex-row min-h-0">
+    <div className="app-container">
+      <main className="main-content">
         <SidePanel side="left" isOpen={leftPanelOpen} width={leftPanelWidth}>
           <AssetPanel onAddObject={handleAddObject} onSetBackground={handleSetBackground} />
         </SidePanel>
 
         <ResizeHandle isVisible={leftPanelOpen} {...leftResizeHandleProps} />
 
-        <div className="flex-1 flex flex-col min-w-0 relative">
+        <div className="canvas-wrapper">
           <Canvas 
             ref={canvasRef} 
             leftPanelOpen={leftPanelOpen}
@@ -182,10 +182,10 @@ const App: React.FC = () => {
       <ResizeHandle isVisible={dockOpen} orientation="horizontal" {...dockResizeHandleProps} />
       
       <Dock height={dockOpen ? dockHeight : 0}>
-        <div className="p-4 h-full">
-            <div className="flex items-center gap-2 border-b border-gray-600 pb-2 mb-2">
+        <div className="dock-content">
+            <div className="dock-header">
                 <RowsIcon className="h-5 w-5" />
-                <h2 className="text-lg font-semibold">Asset Dock</h2>
+                <h2>Asset Dock</h2>
             </div>
             <div className="text-gray-400 text-sm">
                 Assets, console logs, or timelines can go here.
