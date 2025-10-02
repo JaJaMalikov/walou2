@@ -1,7 +1,7 @@
 {
   "name": "modern-interactive-ui-builder",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "predev": "node scripts/generate-assets-manifest.js",
@@ -17,9 +17,9 @@
     "react-zoom-pan-pinch": "^3.7.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
+    "@types/node": "^24.6.2",
     "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "typescript": "~5.9.3",
+    "vite": "^7.1.8"
   }
 }
