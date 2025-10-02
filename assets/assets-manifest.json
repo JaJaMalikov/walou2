@@ -1,42 +1,42 @@
 [
   {
     "name": "Bureau",
-    "path": "/decors/bureau.svg",
+    "path": "decors/bureau.svg",
     "category": "decors"
   },
   {
     "name": "Basse",
-    "path": "/objets/basse.svg",
+    "path": "objets/basse.svg",
     "category": "objets"
   },
   {
     "name": "Faucille",
-    "path": "/objets/faucille.svg",
+    "path": "objets/faucille.svg",
     "category": "objets"
   },
   {
     "name": "Laurier",
-    "path": "/objets/laurier.svg",
+    "path": "objets/laurier.svg",
     "category": "objets"
   },
   {
     "name": "Lunettes manu",
-    "path": "/objets/lunettes_manu.svg",
+    "path": "objets/lunettes_manu.svg",
     "category": "objets"
   },
   {
     "name": "Marteau",
-    "path": "/objets/marteau.svg",
+    "path": "objets/marteau.svg",
     "category": "objets"
   },
   {
     "name": "Manu",
-    "path": "/pantins/Manu.svg",
+    "path": "pantins/Manu.svg",
     "category": "pantins"
   },
   {
     "name": "Bab manu",
-    "path": "/pantins/bab_manu.svg",
+    "path": "pantins/bab_manu.svg",
     "category": "pantins"
   }
 ]

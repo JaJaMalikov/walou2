@@ -24,7 +24,7 @@ function scanDir(dir) {
 
       results.push({
         name: capitalize(name.replace(/_/g, " ")),
-        path: `/${relativePath.replace(/\\/g, "/")}`,
+        path: `${relativePath.replace(/\\/g, "/")}`,
         category
       });
     }
@@ -42,4 +42,3 @@ const manifest = scanDir(ASSETS_DIR);
 writeFileSync(OUTPUT_FILE, JSON.stringify(manifest, null, 2));
 
 console.log(`✅ Manifest généré : ${OUTPUT_FILE} (${manifest.length} fichiers trouvés)`);
-

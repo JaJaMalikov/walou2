@@ -28,7 +28,8 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
     const fetchAssets = async () => {
       setIsLoading(true);
       try {
-        const manifestResponse = await fetch('/assets-manifest.json');
+        const base = import.meta.env.BASE_URL || '/';
+        const manifestResponse = await fetch(`${base}assets-manifest.json`);
         if (!manifestResponse.ok) {
           throw new Error('Failed to fetch asset manifest');
         }
@@ -36,22 +37,24 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
 
         const loadedAssets = await Promise.all(
           manifestAssets.map(async (asset) => {
+            const base = import.meta.env.BASE_URL || '/';
+            const resolvedPath = `${base}${asset.path}`;
             if (asset.path.endsWith('.svg')) {
               try {
-                const response = await fetch(asset.path);
+                const response = await fetch(resolvedPath);
                 if (!response.ok) {
-                  console.error(`Failed to fetch ${asset.path}`);
+                  console.error(`Failed to fetch ${resolvedPath}`);
                   return { ...asset, content: undefined };
                 }
                 const content = await response.text();
-                return { ...asset, content };
+                return { ...asset, path: resolvedPath, content };
               } catch (svgError) {
                  console.error(`Error fetching SVG content for ${asset.name}:`, svgError);
-                 return { ...asset, content: undefined };
+                 return { ...asset, path: resolvedPath, content: undefined };
               }
             }
             // For non-SVG files like PNGs, just return the asset with its path
-            return asset;
+            return { ...asset, path: resolvedPath };
           })
         );
         setAssets(loadedAssets);
