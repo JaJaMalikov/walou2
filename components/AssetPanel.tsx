@@ -28,7 +28,7 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
     const fetchAssets = async () => {
       setIsLoading(true);
       try {
-        const manifestResponse = await fetch('/assets-manifest.json');
+        const manifestResponse = await fetch('/components/assets-manifest.json');
         if (!manifestResponse.ok) {
           throw new Error('Failed to fetch asset manifest');
         }
