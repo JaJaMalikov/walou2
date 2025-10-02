@@ -1,5 +1,6 @@
 import React from 'react';
 import type { SvgObject } from '../types';
+import { ChevronsRightLeftIcon } from './icons';
 
 interface InspectorPanelProps {
   selectedObject: SvgObject | null;
@@ -12,6 +13,16 @@ const ARTICULABLE_PARTS = [
     'cuisse_droite', 'tibia_droite', 'pied_droite',
     'cuisse_gauche', 'tibia_gauche', 'pied_gauche',
 ];
+
+const MIRROR_MAP: { [key: string]: string } = {
+    'haut_bras_droite': 'haut_bras_gauche', 'haut_bras_gauche': 'haut_bras_droite',
+    'avant_bras_droite': 'avant_bras_gauche', 'avant_bras_gauche': 'avant_bras_droite',
+    'main_droite': 'main_gauche', 'main_gauche': 'main_droite',
+    'cuisse_droite': 'cuisse_gauche', 'cuisse_gauche': 'cuisse_droite',
+    'tibia_droite': 'tibia_gauche', 'tibia_gauche': 'tibia_droite',
+    'pied_droite': 'pied_gauche', 'pied_gauche': 'pied_droite',
+};
+
 
 const PropertyInput: React.FC<{ label: string; name: string; value: number; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; }> = ({ label, name, value, onChange }) => (
   <div className="inspector-input-wrapper">
@@ -27,7 +38,7 @@ const PropertyInput: React.FC<{ label: string; name: string; value: number; onCh
   </div>
 );
 
-const ArticulationSlider: React.FC<{ partName: string; value: number; onChange: (partName: string, angle: number) => void;}> = ({ partName, value, onChange }) => (
+const ArticulationSlider: React.FC<{ partName: string; value: number; onChange: (angle: number) => void;}> = ({ partName, value, onChange }) => (
     <div className="articulation-row">
         <label htmlFor={`rot-${partName}`} title={partName}>
             {partName.replace(/_/g, ' ')}
@@ -39,7 +50,7 @@ const ArticulationSlider: React.FC<{ partName: string; value: number; onChange: 
             min="-180"
             max="180"
             value={value}
-            onChange={(e) => onChange(partName, parseInt(e.target.value, 10))}
+            onChange={(e) => onChange(parseInt(e.target.value, 10))}
         />
     </div>
 );
@@ -59,6 +70,11 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
     onUpdateObject(selectedObject.id, {
         articulation: { [partName]: angle }
     });
+  };
+
+  const handleFlip = () => {
+    if (!selectedObject) return;
+    onUpdateObject(selectedObject.id, { flipped: !selectedObject.flipped });
   };
   
   if (!selectedObject) {
@@ -81,7 +97,12 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
         </div>
 
         <div className="inspector-section">
-          <label className="inspector-label">Transform</label>
+          <div className="inspector-label-header">
+            <label className="inspector-label">Transform</label>
+            <button title="Flip Horizontal" className="menu-button" onClick={handleFlip}>
+              <ChevronsRightLeftIcon />
+            </button>
+          </div>
           <div className="inspector-group">
              <div className="inspector-row">
                  <PropertyInput label="X" name="x" value={selectedObject.x} onChange={handleChange} />
@@ -98,14 +119,27 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
             <div className="inspector-section">
                 <label className="inspector-label">Articulation</label>
                 <div className="inspector-group">
-                    {ARTICULABLE_PARTS.map(partName => (
-                        <ArticulationSlider 
-                            key={partName}
-                            partName={partName}
-                            value={selectedObject.articulation?.[partName] || 0}
-                            onChange={handleArticulationChange}
-                        />
-                    ))}
+                    {ARTICULABLE_PARTS.map(partName => {
+                        const isFlipped = selectedObject.flipped;
+                        const controlledPart = (isFlipped && MIRROR_MAP[partName]) ? MIRROR_MAP[partName] : partName;
+                        
+                        let value = selectedObject.articulation?.[controlledPart] || 0;
+                        if (isFlipped) {
+                           value = -value;
+                        }
+
+                        return (
+                            <ArticulationSlider 
+                                key={partName}
+                                partName={partName}
+                                value={value}
+                                onChange={(angle) => {
+                                    const finalAngle = isFlipped ? -angle : angle;
+                                    handleArticulationChange(controlledPart, finalAngle);
+                                }}
+                            />
+                        )
+                    })}
                 </div>
             </div>
         )}

@@ -19,6 +19,7 @@ export interface SvgObject {
   height: number;
   category: AssetCategory;
   articulation?: { [key: string]: number }; // e.g. { tete: -15, bras_gauche: 20 }
+  flipped?: boolean;
 }
 
 

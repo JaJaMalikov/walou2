@@ -171,6 +171,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       y: centerY - dimensions.height / 2,
       ...dimensions,
       category,
+      flipped: false,
       ...(category === 'pantins' && { articulation: {} }),
     };
     setSvgObjects(prev => [...prev, newSvg]);
@@ -363,14 +364,16 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     bounds="parent"
                     className={`resizable-object ${selectedObjectId === obj.id ? 'selected' : ''}`}
                   >
-                   {obj.category === 'pantins' ? (
-                      <Pantin object={obj} />
-                    ) : (
-                       <div
-                        className="pantin-container"
-                        dangerouslySetInnerHTML={{ __html: obj.content.replace(/<svg[^>]*>/, '$& style="width: 100%; height: 100%;"') }}
-                      />
-                    )}
+                   <div style={{ width: '100%', height: '100%', transform: obj.flipped ? 'scaleX(-1)' : 'none' }}>
+                    {obj.category === 'pantins' ? (
+                        <Pantin object={obj} />
+                      ) : (
+                        <div
+                          className="pantin-container"
+                          dangerouslySetInnerHTML={{ __html: obj.content.replace(/<svg[^>]*>/, '$& style="width: 100%; height: 100%;"') }}
+                        />
+                      )}
+                    </div>
                   </Rnd>
                 ))}
 
