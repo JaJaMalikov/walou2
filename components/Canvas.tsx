@@ -312,9 +312,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         initialPositionY={transformState.positionY}
         onTransformed={(_, state) => setTransformState(state)}
         minScale={0.1}
-        limitToBounds={true}
+        limitToBounds={false}
+        centerOnInit={true}
         doubleClick={{ disabled: true }}
-        centerZoomedOut={true}
+        centerZoomedOut={false}
         panning={{ disabled: isObjectInteracting }}
       >
         <>
