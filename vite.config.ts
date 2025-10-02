@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
-      base: process.env.REPO_NAME ? `/${process.env.REPO_NAME}/` : '/',
+      base: env.VITE_BASE || '/',
       server: {
         port: 3000,
         host: '0.0.0.0',
