@@ -2,7 +2,7 @@ import { readdirSync, writeFileSync, statSync } from "fs";
 import { join, relative } from "path";
 
 const ASSETS_DIR = "./assets";
-const OUTPUT_FILE = "./components/assets-manifest.json";
+const OUTPUT_FILE = "./assets/assets-manifest.json";
 
 function scanDir(dir) {
   const entries = readdirSync(dir);
