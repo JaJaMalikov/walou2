@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect, useMemo } from 'react';
 import type { SvgObject } from '../types';
 
 interface PantinProps {
@@ -6,25 +6,6 @@ interface PantinProps {
 }
 
 // Defines the parent-child relationships for rotation calculation
-const PUPPET_HIERARCHY: { [key: string]: string | null } = {
-    'tete': 'cou',
-    'haut_bras_droite': 'epaule_droite',
-    'avant_bras_droite': 'haut_bras_droite',
-    'main_droite': 'avant_bras_droite',
-    'haut_bras_gauche': 'epaule_gauche',
-    'avant_bras_gauche': 'haut_bras_gauche',
-    'main_gauche': 'avant_bras_gauche',
-    'cuisse_droite': 'hanche_droite',
-    'tibia_droite': 'cuisse_droite',
-    'pied_droite': 'tibia_droite',
-    'cuisse_gauche': 'hanche_gauche',
-    'tibia_gauche': 'cuisse_gauche',
-    'pied_gauche': 'tibia_gauche',
-    // Parts without parents in this hierarchy
-    'cou': null, 'epaule_droite': null, 'epaule_gauche': null,
-    'hanche_droite': null, 'hanche_gauche': null,
-};
-
 const ARTICULABLE_PARTS = [
     'tete', 'haut_bras_droite', 'avant_bras_droite', 'main_droite',
     'haut_bras_gauche', 'avant_bras_gauche', 'main_gauche',

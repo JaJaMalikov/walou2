@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback } from 'react';
-import type { Axis, Direction } from '../../types';
+import type { Axis, Direction } from '@/types.ts';
 
 interface UseResizableProps {
   initialSize: number;

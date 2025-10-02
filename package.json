@@ -11,8 +11,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react-dom": "^19.2.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "react-rnd": "^10.5.2",
     "react-zoom-pan-pinch": "^3.7.0"
   },
