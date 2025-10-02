@@ -143,7 +143,7 @@ export const Pantin: React.FC<PantinProps> = ({ object }) => {
     const articulation = object.articulation || {};
 
     return (
-        <svg ref={svgRef} {...root.props} className="pantin-container">
+        <svg ref={svgRef} {...root.props} style={{ overflow: 'visible' }} className="pantin-container">
             {root.children.map((child, index) => (
                 <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} />
             ))}
