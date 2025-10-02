@@ -1,5 +1,5 @@
 import { readdirSync, writeFileSync, statSync } from "fs";
-import { join, relative } from "path";
+import { join, relative, extname } from "path";
 
 const ASSETS_DIR = "./assets";
 const OUTPUT_FILE = "./assets/assets-manifest.json";
