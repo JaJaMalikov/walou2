@@ -315,7 +315,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         onFitView={fitView}
         onZoomIn={() => transformWrapperRef.current?.zoomIn()}
         onZoomOut={() => transformWrapperRef.current?.zoomOut()}
-        onResetTransform={() => transformWrapperRef.current?.resetTransform()}
       />
       <TransformWrapper
         ref={transformWrapperRef}

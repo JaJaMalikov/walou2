@@ -6,7 +6,6 @@ import {
   FitToScreenIcon, 
   ZoomInIcon, 
   ZoomOutIcon, 
-  ExpandIcon,
   PanelLeftIcon,
   PanelRightIcon,
   RowsIcon
@@ -33,14 +32,13 @@ interface FloatingMenuProps {
   onFitView: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  onResetTransform: () => void;
 }
 
 export const FloatingMenu: React.FC<FloatingMenuProps> = ({ 
   menuState, onMenuChange, selectedObjectId, onDelete,
   leftPanelOpen, rightPanelOpen, dockOpen,
   onToggleLeftPanel, onToggleRightPanel, onToggleDock,
-  onFitView, onZoomIn, onZoomOut, onResetTransform
+  onFitView, onZoomIn, onZoomOut
 }) => {
   return (
     <Rnd
@@ -89,9 +87,6 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
             </button>
             <button title="Zoom Out" onClick={onZoomOut} className="menu-button">
                 <ZoomOutIcon />
-            </button>
-            <button title="Reset Transform" onClick={onResetTransform} className="menu-button">
-                <ExpandIcon />
             </button>
             <div className="menu-divider"></div>
              <button title="Toggle Left Panel (Ctrl+L)" aria-label="Toggle Left Panel" onClick={onToggleLeftPanel} className={`menu-button ${leftPanelOpen ? 'active' : ''}`}>
