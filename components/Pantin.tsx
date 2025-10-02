@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import type { SvgObject } from '../types';
 
 interface PantinProps {
@@ -25,92 +25,128 @@ const PUPPET_HIERARCHY: { [key: string]: string | null } = {
     'hanche_droite': null, 'hanche_gauche': null,
 };
 
-const ARTICULABLE_PARTS = Object.keys(PUPPET_HIERARCHY).filter(key => PUPPET_HIERARCHY[key] !== undefined);
+const ARTICULABLE_PARTS = [
+    'tete', 'haut_bras_droite', 'avant_bras_droite', 'main_droite',
+    'haut_bras_gauche', 'avant_bras_gauche', 'main_gauche',
+    'cuisse_droite', 'tibia_droite', 'pied_droite',
+    'cuisse_gauche', 'tibia_gauche', 'pied_gauche',
+];
+
+interface SvgNode {
+    type: string;
+    props: { [key: string]: any };
+    children: SvgNode[];
+}
+
+const findPivotCoords = (el: Element | null): string | null => {
+    if (!el) return null;
+    const pivotCircle = el.querySelector(":scope > circle.pivot") as SVGCircleElement | null;
+    if (!pivotCircle) return null;
+
+    const cx = parseFloat(pivotCircle.getAttribute("cx") || "");
+    const cy = parseFloat(pivotCircle.getAttribute("cy") || "");
+    if (isNaN(cx) || isNaN(cy)) return null;
+
+    return `${cx}px ${cy}px`;
+};
+
+// Recursive component to render SVG nodes
+const SvgPart: React.FC<{ node: SvgNode; articulation: { [key: string]: number }, pivots: { [key: string]: string } }> = ({ node, articulation, pivots }) => {
+    const { type, props, children } = node;
+    const style: React.CSSProperties = { ...props.style };
+
+    const partId = props.id;
+    if (partId && ARTICULABLE_PARTS.includes(partId)) {
+        const pivot = pivots[partId];
+        if (pivot) {
+            style.transformOrigin = pivot;
+            (style as any).transformBox = "view-box";
+        }
+        
+        const angle = articulation[partId] || 0;
+        style.transform = `rotate(${angle}deg)`;
+    }
+
+    return React.createElement(
+        type,
+        { ...props, style },
+        children.map((child, index) => <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} />)
+    );
+};
 
 export const Pantin: React.FC<PantinProps> = ({ object }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  
-  const sendToBack = (el: Element | null) => {
-      if (el && el.parentNode) {
-          el.parentNode.insertBefore(el, el.parentNode.firstChild);
-      }
-  };
+    const svgRef = useRef<SVGSVGElement>(null);
 
-  const findPivotCoords = (el: SVGElement | null): string | null => {
-      if (!el || !el.parentNode) return null;
-      const parent = el.parentNode as Element;
-      const pivotCircle = parent.querySelector(":scope > circle.pivot") as SVGCircleElement | null;
-      if (!pivotCircle) return null;
+    const parsedSvg = useMemo(() => {
+        if (!object.content) return null;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(object.content, 'image/svg+xml');
+        const svgElement = doc.querySelector('svg');
+        if (!svgElement) return null;
 
-      const cx = parseFloat(pivotCircle.getAttribute("cx") || "");
-      const cy = parseFloat(pivotCircle.getAttribute("cy") || "");
-      if (isNaN(cx) || isNaN(cy)) return null;
+        const parseNode = (node: Element): SvgNode => {
+            const props: { [key: string]: any } = {};
+            for (const attr of Array.from(node.attributes)) {
+                if (attr.name === 'class') {
+                    props.className = attr.value;
+                } else if (attr.name.includes('-')) {
+                    // Convert kebab-case to camelCase for React style props, e.g., fill-rule -> fillRule
+                    const camelCaseName = attr.name.replace(/-([a-z])/g, g => g[1].toUpperCase());
+                    props[camelCaseName] = attr.value;
+                } else {
+                    props[attr.name] = attr.value;
+                }
+            }
 
-      return `${cx}px ${cy}px`;
-  };
+            const children = Array.from(node.children).map(parseNode);
+            return { type: node.tagName.toLowerCase(), props, children };
+        };
+        
+        const pivots: { [key: string]: string } = {};
+        ARTICULABLE_PARTS.forEach(partId => {
+            const el = svgElement.querySelector(`#${partId}`);
+            if (el) {
+                const pivot = findPivotCoords(el.parentElement);
+                if (pivot) {
+                    pivots[partId] = pivot;
+                }
+            }
+        });
 
-  // Effect for initial setup: z-ordering, find pivots and set transform origins
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+        const rootNode = parseNode(svgElement);
 
-    // Z-order adjustments
-    ["poignet_droite", "poignet_gauche", "hanche_droite", "hanche_gauche"].forEach((id) => {
-        const node = container.querySelector(`#${id}`);
-        if (node) sendToBack(node);
-    });
+        return { root: rootNode, pivots };
+    }, [object.content]);
 
-    ARTICULABLE_PARTS.forEach(partId => {
-      const el = container.querySelector(`#${partId}`) as SVGElement | null;
-      if (el) {
-        const pivot = findPivotCoords(el);
-        if (pivot) {
-          el.style.transformOrigin = pivot;
-          (el.style as any).transformBox = "view-box";
-        }
-      }
-    });
-  }, [object.content]);
+    useEffect(() => {
+        const svg = svgRef.current;
+        if (!svg) return;
 
-  // Effect for applying rotations when articulation props change
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+        const sendToBack = (el: Element | null) => {
+            if (el && el.parentNode) {
+                el.parentNode.insertBefore(el, el.parentNode.firstChild);
+            }
+        };
+
+        // Z-order adjustments on mount
+        ["poignet_droite", "poignet_gauche", "hanche_droite", "hanche_gauche"].forEach((id) => {
+            const node = svg.querySelector(`#${id}`);
+            if (node) sendToBack(node);
+        });
+    }, [parsedSvg]); // Rerun only when the SVG content changes
+
+    if (!parsedSvg) {
+        return <div className="w-full h-full bg-red-500/20 text-white flex items-center justify-center"><p>Error parsing SVG</p></div>;
+    }
     
-    const appliedRotations: { [key: string]: number } = {};
-    const articulationState = object.articulation || {};
+    const { root, pivots } = parsedSvg;
+    const articulation = object.articulation || {};
 
-    const getRotation = (partId: string): number => {
-        return articulationState[partId] || 0;
-    };
-    
-    // Function to calculate final rotation including parents'
-    const getAbsoluteRotation = (partId: string): number => {
-        let totalAngle = 0;
-        let currentPart: string | null = partId;
-        while(currentPart && PUPPET_HIERARCHY[currentPart] !== undefined) {
-            totalAngle += getRotation(currentPart);
-            currentPart = PUPPET_HIERARCHY[currentPart];
-        }
-        return totalAngle;
-    };
-
-    ARTICULABLE_PARTS.forEach(partId => {
-        const el = container.querySelector(`#${partId}`) as SVGElement | null;
-        if (el) {
-            const angle = getRotation(partId);
-            el.style.transform = `rotate(${angle}deg)`;
-        }
-    });
-
-  }, [object.articulation, object.content]);
-  
-
-  return (
-    <div
-      ref={containerRef}
-      className="w-full h-full [&>svg]:w-full [&>svg]:h-full"
-      dangerouslySetInnerHTML={{ __html: object.content }}
-    />
-  );
+    return (
+        <svg ref={svgRef} {...root.props} className="w-full h-full">
+            {root.children.map((child, index) => (
+                <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} />
+            ))}
+        </svg>
+    );
 };
