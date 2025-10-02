@@ -380,9 +380,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                       <Pantin object={obj} />
                     ) : (
                        <div
-                        className="w-full h-full"
-                        style={{'--svg-width': '100%', '--svg-height': '100%'} as any}
-                        dangerouslySetInnerHTML={{ __html: obj.content.replace(/<svg[^>]*>/, '$& style="width: var(--svg-width); height: var(--svg-height);"') }}
+                        className="pantin-container"
+                        dangerouslySetInnerHTML={{ __html: obj.content.replace(/<svg[^>]*>/, '$& style="width: 100%; height: 100%;"') }}
                       />
                     )}
                   </Rnd>
@@ -401,7 +400,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       </TransformWrapper>
       {isDragging && (
         <div className="drop-overlay" aria-hidden="true">
-          <UploadCloudIcon style={{width: '5rem', height: '5rem', color: '#60a5fa', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'}} />
+          <UploadCloudIcon />
           <p>Drop your PNG or SVG file</p>
         </div>
       )}

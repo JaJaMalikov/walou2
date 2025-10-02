@@ -136,14 +136,14 @@ export const Pantin: React.FC<PantinProps> = ({ object }) => {
     }, [parsedSvg]); // Rerun only when the SVG content changes
 
     if (!parsedSvg) {
-        return <div className="w-full h-full bg-red-500/20 text-white flex items-center justify-center"><p>Error parsing SVG</p></div>;
+        return <div className="pantin-error"><p>Error parsing SVG</p></div>;
     }
     
     const { root, pivots } = parsedSvg;
     const articulation = object.articulation || {};
 
     return (
-        <svg ref={svgRef} {...root.props} className="w-full h-full">
+        <svg ref={svgRef} {...root.props} className="pantin-container">
             {root.children.map((child, index) => (
                 <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} />
             ))}

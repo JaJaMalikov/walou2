@@ -184,10 +184,10 @@ const App: React.FC = () => {
       <Dock height={dockOpen ? dockHeight : 0}>
         <div className="dock-content">
             <div className="dock-header">
-                <RowsIcon className="h-5 w-5" />
+                <RowsIcon />
                 <h2>Asset Dock</h2>
             </div>
-            <div className="text-gray-400 text-sm">
+            <div className="dock-text">
                 Assets, console logs, or timelines can go here.
             </div>
         </div>

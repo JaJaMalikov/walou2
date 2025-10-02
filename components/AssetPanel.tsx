@@ -79,7 +79,7 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
               aria-current={activeTab === category}
               title={categoryNames[category]}
             >
-              <Icon className="h-5 w-5" />
+              <Icon />
             </button>
           );
         })}

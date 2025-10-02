@@ -62,7 +62,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
     >
       <div className="floating-menu-content" role="toolbar">
         <button className="drag-handle" aria-label="Move toolbar">
-          <MoveIcon className="w-5 h-5" />
+          <MoveIcon />
         </button>
         <div className="menu-divider"></div>
         <div className="menu-buttons">
@@ -73,7 +73,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
                 disabled={!selectedObjectId}
                 className="menu-button delete-button"
             >
-                <TrashIcon className="w-5 h-5"/>
+                <TrashIcon />
             </button>
             <div className="menu-divider"></div>
              <button
@@ -82,26 +82,26 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
                 onClick={onFitView}
                 className="menu-button"
             >
-                <FitToScreenIcon className="w-5 h-5" />
+                <FitToScreenIcon />
             </button>
             <button title="Zoom In" onClick={onZoomIn} className="menu-button">
-                <ZoomInIcon className="w-5 h-5" />
+                <ZoomInIcon />
             </button>
             <button title="Zoom Out" onClick={onZoomOut} className="menu-button">
-                <ZoomOutIcon className="w-5 h-5" />
+                <ZoomOutIcon />
             </button>
             <button title="Reset Transform" onClick={onResetTransform} className="menu-button">
-                <ExpandIcon className="w-5 h-5" />
+                <ExpandIcon />
             </button>
             <div className="menu-divider"></div>
              <button title="Toggle Left Panel (Ctrl+L)" aria-label="Toggle Left Panel" onClick={onToggleLeftPanel} className={`menu-button ${leftPanelOpen ? 'active' : ''}`}>
-                <PanelLeftIcon className="w-5 h-5" />
+                <PanelLeftIcon />
             </button>
             <button title="Toggle Right Panel (Ctrl+P)" aria-label="Toggle Right Panel" onClick={onToggleRightPanel} className={`menu-button ${rightPanelOpen ? 'active' : ''}`}>
-                <PanelRightIcon className="w-5 h-5" />
+                <PanelRightIcon />
             </button>
              <button title="Toggle Dock (Ctrl+T)" aria-label="Toggle Dock" onClick={onToggleDock} className={`menu-button ${dockOpen ? 'active' : ''}`}>
-                <RowsIcon className="w-5 h-5" />
+                <RowsIcon />
             </button>
         </div>
       </div>
