@@ -36,12 +36,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Echo repo name
+        run: echo "REPO_NAME=${{ github.event.repository.name }}"
+
       - name: Build
         env:
-          # Ensure Vite builds with the correct base for project pages
           REPO_NAME: ${{ github.event.repository.name }}
-        run: |
-          pnpm build -- --base=/${REPO_NAME}/
+        run: pnpm build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -61,4 +62,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-
