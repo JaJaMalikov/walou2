@@ -110,7 +110,7 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
                         {asset.category === 'decors' ? (
                             <img src={asset.path} alt={asset.name} />
                         ) : (
-                            <div dangerouslySetInnerHTML={{ __html: asset.content || '' }} />
+                            <img src={asset.path} alt={asset.name} />
                         )}
                     </div>
                   </button>

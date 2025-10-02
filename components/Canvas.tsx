@@ -51,6 +51,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   
   const transformWrapperRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     try {
@@ -132,48 +133,26 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   
   const fitView = useCallback(() => {
     const transformWrapper = transformWrapperRef.current;
-    if (!transformWrapper) return;
+    const container = containerRef.current;
+    if (!transformWrapper || !canvasDimensions || !container) return;
 
     const { setTransform } = transformWrapper;
-    const wrapperComponent = transformWrapper.instance.wrapperComponent;
-    if (!wrapperComponent) return;
 
-    const viewRect = wrapperComponent.getBoundingClientRect();
-    
-    let contentBounds = {
-      minX: Infinity, minY: Infinity,
-      maxX: -Infinity, maxY: -Infinity,
-    };
+    const viewRect = container.getBoundingClientRect();
 
-    if (canvasDimensions) {
-      contentBounds = { minX: 0, minY: 0, maxX: canvasDimensions.width, maxY: canvasDimensions.height };
-    } else if (svgObjects.length > 0) {
-        svgObjects.forEach(obj => {
-          contentBounds.minX = Math.min(contentBounds.minX, obj.x);
-          contentBounds.minY = Math.min(contentBounds.minY, obj.y);
-          contentBounds.maxX = Math.max(contentBounds.maxX, obj.x + obj.width);
-          contentBounds.maxY = Math.max(contentBounds.maxY, obj.y + obj.height);
-      });
-    } else {
-      return; // No content to fit
-    }
-    
-    const contentWidth = contentBounds.maxX - contentBounds.minX;
-    const contentHeight = contentBounds.maxY - contentBounds.minY;
-    
+    const contentWidth = canvasDimensions.width;
+    const contentHeight = canvasDimensions.height;
     if (contentWidth <= 0 || contentHeight <= 0) return;
-    
-    const marginFactor = 0.9;
-    
+
     const scaleX = viewRect.width / contentWidth;
     const scaleY = viewRect.height / contentHeight;
-    const newScale = Math.min(scaleX, scaleY) * marginFactor;
+    const newScale = Math.min(scaleX, scaleY);
 
-    const newPositionX = (viewRect.width - (contentWidth * newScale)) / 2 - (contentBounds.minX * newScale);
-    const newPositionY = (viewRect.height - (contentHeight * newScale)) / 2 - (contentBounds.minY * newScale);
+    const newPositionX = (viewRect.width - contentWidth * newScale) / 2;
+    const newPositionY = (viewRect.height - contentHeight * newScale) / 2;
 
     setTransform(newPositionX, newPositionY, newScale, 300, 'easeOut');
-  }, [canvasDimensions, svgObjects]);
+  }, [canvasDimensions]);
 
   const addObject = useCallback((svgContent: string, category: AssetCategory) => {
     const wrapperComponent = transformWrapperRef.current?.instance.wrapperComponent;
@@ -241,6 +220,14 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     }
   }, [addObject, setBackground]);
 
+  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileDrop(file);
+      e.currentTarget.value = '';
+    }
+  }, [handleFileDrop]);
+
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
     setIsObjectInteracting(false);
     setSvgObjects(prev =>
@@ -300,8 +287,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   if (!transformState) return <div className="canvas-container" />;
 
   return (
-    <div className="canvas-container" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
-       <FloatingMenu 
+    <div ref={containerRef} className="canvas-container" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+      <FloatingMenu 
         menuState={menuState}
         onMenuChange={handleMenuChange}
         selectedObjectId={selectedObjectId} 
@@ -315,6 +302,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         onFitView={fitView}
         onZoomIn={() => transformWrapperRef.current?.zoomIn()}
         onZoomOut={() => transformWrapperRef.current?.zoomOut()}
+        zoomPercent={Math.round(transformState.scale * 100)}
       />
       <TransformWrapper
         ref={transformWrapperRef}
@@ -323,7 +311,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         initialPositionY={transformState.positionY}
         onTransformed={(_, state) => setTransformState(state)}
         minScale={0.1}
-        limitToBounds={!!canvasDimensions}
+        limitToBounds={true}
         doubleClick={{ disabled: true }}
         centerZoomedOut={true}
         panning={{ disabled: isObjectInteracting }}
@@ -336,14 +324,14 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     </button>
                 )}
             </div>
-            <TransformComponent wrapperClass="!w-full !h-full">
+            <TransformComponent>
               <div
                 id="canvas-area"
                 onMouseDown={handleDeselect}
                 className={`canvas-area ${!hasContent ? 'empty' : ''} ${isDragging ? 'dragging' : ''}`}
-                style={canvasDimensions ? { width: `${canvasDimensions.width}px`, height: `${canvasDimensions.height}px`, backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : 'none' } : {}}
+                style={canvasDimensions ? { width: `${canvasDimensions.width}px`, height: `${canvasDimensions.height}px`, backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : 'none' } : { width: '100%', height: '100%' }}
               >
-                {!canvasDimensions && <div style={{width: '60vw', height: '60vh'}}></div>}
+                {/* canvas fills parent when no explicit dimensions */}
                 
                 {svgObjects.map(obj => (
                   <Rnd
@@ -390,6 +378,12 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                      <div className="canvas-placeholder">
                         <h3>Drop PNG background or SVG file</h3>
                         <p>The first PNG will set the canvas size</p>
+                        <div style={{ marginTop: '0.75rem' }}>
+                          <input id="file-input" type="file" accept="image/png, image/svg+xml" onChange={handleFileInput} style={{ display: 'none' }} />
+                          <button className="menu-button" onClick={() => document.getElementById('file-input')?.click()} aria-label="Choose file to upload">
+                            Choose File
+                          </button>
+                        </div>
                         {error && <p className="error">{error}</p>}
                      </div>
                 )}

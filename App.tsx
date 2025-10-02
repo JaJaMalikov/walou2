@@ -3,7 +3,7 @@ import { SidePanel } from './components/SidePanel';
 import { Dock } from './components/Dock';
 import { Canvas } from './components/Canvas';
 import { ResizeHandle } from './components/ResizeHandle';
-import { useResizable } from './hooks/useResizable';
+import { useResizable } from './components/icons/useResizable';
 import { AssetPanel } from './components/AssetPanel';
 import { InspectorPanel } from './components/InspectorPanel';
 import type { CanvasRef, SvgObject, AssetCategory } from './types';
@@ -80,6 +80,8 @@ const App: React.FC = () => {
           dockHeight,
         };
         localStorage.setItem(UI_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
+        // after resize settles, fit the view to the available space
+        canvasRef.current?.fitView();
       } catch (error) {
         console.error("Failed to save UI layout to localStorage", error);
       }
@@ -95,20 +97,19 @@ const App: React.FC = () => {
       if ((e.target as HTMLElement).nodeName === 'INPUT' || (e.target as HTMLElement).nodeName === 'TEXTAREA') {
         return;
       }
-      
       if (e.ctrlKey) {
         switch (e.key.toLowerCase()) {
           case 'l':
             e.preventDefault();
-            setLeftPanelOpen(prev => !prev);
+            handleToggleLeftPanel();
             break;
           case 'p':
             e.preventDefault();
-            setRightPanelOpen(prev => !prev);
+            handleToggleRightPanel();
             break;
           case 't':
             e.preventDefault();
-            setDockOpen(prev => !prev);
+            handleToggleDock();
             break;
           case 'f':
             e.preventDefault();
@@ -150,6 +151,26 @@ const App: React.FC = () => {
     setSelectedObject(prev => (prev && prev.id === id) ? { ...prev, ...finalProps } : prev);
   };
 
+  const scheduleFitView = () => {
+    // allow layout to settle before fitting
+    requestAnimationFrame(() => canvasRef.current?.fitView());
+  };
+
+  const handleToggleLeftPanel = () => {
+    setLeftPanelOpen(p => !p);
+    scheduleFitView();
+  };
+
+  const handleToggleRightPanel = () => {
+    setRightPanelOpen(p => !p);
+    scheduleFitView();
+  };
+
+  const handleToggleDock = () => {
+    setDockOpen(p => !p);
+    scheduleFitView();
+  };
+
   return (
     <div className="app-container">
       <main className="main-content">
@@ -165,9 +186,9 @@ const App: React.FC = () => {
             leftPanelOpen={leftPanelOpen}
             rightPanelOpen={rightPanelOpen}
             dockOpen={dockOpen}
-            onToggleLeftPanel={() => setLeftPanelOpen(p => !p)}
-            onToggleRightPanel={() => setRightPanelOpen(p => !p)}
-            onToggleDock={() => setDockOpen(p => !p)}
+            onToggleLeftPanel={handleToggleLeftPanel}
+            onToggleRightPanel={handleToggleRightPanel}
+            onToggleDock={handleToggleDock}
             onObjectSelect={setSelectedObject}
           />
         </div>

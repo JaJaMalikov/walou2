@@ -1,13 +1,12 @@
 
 import React from 'react';
 
-interface ResizeHandleProps {
-  onMouseDown: (e: React.MouseEvent) => void;
+interface ResizeHandleProps extends React.HTMLAttributes<HTMLDivElement> {
   isVisible: boolean;
   orientation?: 'vertical' | 'horizontal';
 }
 
-export const ResizeHandle: React.FC<ResizeHandleProps> = ({ onMouseDown, isVisible, orientation = 'vertical' }) => {
+export const ResizeHandle: React.FC<ResizeHandleProps> = ({ isVisible, orientation = 'vertical', ...rest }) => {
   if (!isVisible) {
     return null;
   }
@@ -15,7 +14,7 @@ export const ResizeHandle: React.FC<ResizeHandleProps> = ({ onMouseDown, isVisib
   return (
     <div
       className={`resize-handle ${orientation}`}
-      onMouseDown={onMouseDown}
+      {...rest}
     />
   );
 };

@@ -32,13 +32,14 @@ interface FloatingMenuProps {
   onFitView: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
+  zoomPercent?: number;
 }
 
 export const FloatingMenu: React.FC<FloatingMenuProps> = ({ 
   menuState, onMenuChange, selectedObjectId, onDelete,
   leftPanelOpen, rightPanelOpen, dockOpen,
   onToggleLeftPanel, onToggleRightPanel, onToggleDock,
-  onFitView, onZoomIn, onZoomOut
+  onFitView, onZoomIn, onZoomOut, zoomPercent
 }) => {
   return (
     <Rnd
@@ -67,6 +68,7 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
             <button
                 title="Delete Selected (Del)"
                 aria-label="Delete Selected"
+                aria-keyshortcuts="Del, Backspace"
                 onClick={selectedObjectId ? onDelete : undefined}
                 disabled={!selectedObjectId}
                 className="menu-button delete-button"
@@ -77,25 +79,29 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
              <button
                 title="Fit to Screen (Ctrl+F)"
                 aria-label="Fit to Screen"
+                aria-keyshortcuts="Ctrl+F"
                 onClick={onFitView}
                 className="menu-button"
             >
                 <FitToScreenIcon />
             </button>
-            <button title="Zoom In" onClick={onZoomIn} className="menu-button">
+            <button title="Zoom In" aria-keyshortcuts="+" onClick={onZoomIn} className="menu-button">
                 <ZoomInIcon />
             </button>
-            <button title="Zoom Out" onClick={onZoomOut} className="menu-button">
+            <button title="Zoom Out" aria-keyshortcuts="-" onClick={onZoomOut} className="menu-button">
                 <ZoomOutIcon />
             </button>
+            {typeof zoomPercent === 'number' && (
+              <span className="zoom-indicator" aria-live="polite" aria-atomic="true">{zoomPercent}%</span>
+            )}
             <div className="menu-divider"></div>
-             <button title="Toggle Left Panel (Ctrl+L)" aria-label="Toggle Left Panel" onClick={onToggleLeftPanel} className={`menu-button ${leftPanelOpen ? 'active' : ''}`}>
+             <button title="Toggle Left Panel (Ctrl+L)" aria-label="Toggle Left Panel" aria-keyshortcuts="Ctrl+L" onClick={onToggleLeftPanel} className={`menu-button ${leftPanelOpen ? 'active' : ''}`}>
                 <PanelLeftIcon />
             </button>
-            <button title="Toggle Right Panel (Ctrl+P)" aria-label="Toggle Right Panel" onClick={onToggleRightPanel} className={`menu-button ${rightPanelOpen ? 'active' : ''}`}>
+            <button title="Toggle Right Panel (Ctrl+P)" aria-label="Toggle Right Panel" aria-keyshortcuts="Ctrl+P" onClick={onToggleRightPanel} className={`menu-button ${rightPanelOpen ? 'active' : ''}`}>
                 <PanelRightIcon />
             </button>
-             <button title="Toggle Dock (Ctrl+T)" aria-label="Toggle Dock" onClick={onToggleDock} className={`menu-button ${dockOpen ? 'active' : ''}`}>
+             <button title="Toggle Dock (Ctrl+T)" aria-label="Toggle Dock" aria-keyshortcuts="Ctrl+T" onClick={onToggleDock} className={`menu-button ${dockOpen ? 'active' : ''}`}>
                 <RowsIcon />
             </button>
         </div>
