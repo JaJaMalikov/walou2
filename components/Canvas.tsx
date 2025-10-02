@@ -155,10 +155,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   }, [canvasDimensions]);
 
   const addObject = useCallback((svgContent: string, category: AssetCategory) => {
-    const wrapperComponent = transformWrapperRef.current?.instance.wrapperComponent;
-    if (!wrapperComponent || !transformState) return;
+    const viewportEl = containerRef.current;
+    if (!viewportEl || !transformState) return;
     
-    const viewRect = wrapperComponent.getBoundingClientRect();
+    const viewRect = viewportEl.getBoundingClientRect();
     const dimensions = getSvgDimensions(svgContent);
 
     const centerX = (viewRect.width / 2 - transformState.positionX) / transformState.scale;
