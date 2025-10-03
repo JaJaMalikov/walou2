@@ -152,7 +152,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     const newPositionX = (viewRect.width - contentWidth * newScale) / 2;
     const newPositionY = (viewRect.height - contentHeight * newScale) / 2;
 
-    setTransform(newPositionX, newPositionY, newScale, 300, 'easeOut');
+    setTransform(newPositionX, newPositionY, newScale);
   }, [canvasDimensions]);
 
   const addObject = useCallback((svgContent: string, category: AssetCategory) => {
@@ -394,20 +394,6 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     </div>
                   </Rnd>
                 ))}
-
-                {!hasContent && (
-                     <div className="canvas-placeholder">
-                        <h3>Drop PNG background or SVG file</h3>
-                        <p>The first PNG will set the canvas size</p>
-                        <div style={{ marginTop: '0.75rem' }}>
-                          <input id="file-input" type="file" accept="image/png, image/svg+xml" onChange={handleFileInput} style={{ display: 'none' }} />
-                          <button className="menu-button" onClick={() => document.getElementById('file-input')?.click()} aria-label="Choose file to upload">
-                            Choose File
-                          </button>
-                        </div>
-                        {error && <p className="error">{error}</p>}
-                     </div>
-                )}
               </div>
             </TransformComponent>
           </>

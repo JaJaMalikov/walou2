@@ -147,7 +147,6 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 .resize-handle {
   background-color: var(--color-border);
   flex-shrink: 0;
-  transition: background-color 200ms ease-in-out;
 }
 .resize-handle:hover { background-color: var(--color-accent); }
 .resize-handle.vertical { width: 6px; cursor: col-resize; }

@@ -14,9 +14,9 @@ const categoryIcons: Record<AssetCategory, React.ElementType> = {
   decors: ImageIcon,
 };
 const categoryNames: Record<AssetCategory, string> = {
+  decors: 'Décors',
   pantins: 'Pantins',
   objets: 'Objets',
-  decors: 'Décors',
 };
 
 export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackground }) => {

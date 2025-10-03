@@ -30,8 +30,8 @@ const loadUILayout = (): UiLayout => {
     console.error("Failed to load UI layout from localStorage", error);
   }
   return {
-    leftPanelWidth: 280,
-    rightPanelWidth: 280,
+    leftPanelWidth: 200,
+    rightPanelWidth: 200,
     dockHeight: 150,
   };
 };
