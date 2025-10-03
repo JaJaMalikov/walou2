@@ -5,6 +5,7 @@ import { UploadCloudIcon, TrashIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
 import type { CanvasRef, SvgObject, AssetCategory } from '../types';
 import { Pantin } from './Pantin';
+import { processSvg, getSvgDimensions } from './utils';
 
 interface MenuState {
   x: number;
@@ -13,8 +14,7 @@ interface MenuState {
   height: number | string;
 }
 
-interface CanvasState {
-  svgObjects: SvgObject[];
+interface CanvasLocalState {
   backgroundImageUrl: string | null;
   canvasDimensions: { width: number; height: number } | null;
   transformState: {
@@ -26,6 +26,7 @@ interface CanvasState {
 }
 
 interface CanvasProps {
+  svgObjects: SvgObject[];
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
   dockOpen: boolean;
@@ -33,17 +34,27 @@ interface CanvasProps {
   onToggleRightPanel: () => void;
   onToggleDock: () => void;
   onObjectSelect: (object: SvgObject | null) => void;
+  onObjectContextMenu: (e: React.MouseEvent, objectId: string) => void;
+  onAddObject: (newObject: SvgObject) => void;
+  onUpdateObject: (id: string, newProps: Partial<SvgObject>) => void;
+  onDeleteObject: (id: string) => void;
+  onResetCanvas: () => void;
 }
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(({ 
+  svgObjects,
   leftPanelOpen, rightPanelOpen, dockOpen,
   onToggleLeftPanel, onToggleRightPanel, onToggleDock, 
-  onObjectSelect
+  onObjectSelect,
+  onObjectContextMenu,
+  onAddObject,
+  onUpdateObject,
+  onDeleteObject,
+  onResetCanvas
 }, ref) => {
-  const [svgObjects, setSvgObjects] = useState<SvgObject[]>([]);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState<{width: number, height: number} | null>(null);
-  const [transformState, setTransformState] = useState<CanvasState['transformState'] | null>(null);
+  const [transformState, setTransformState] = useState<CanvasLocalState['transformState'] | null>(null);
   const [menuState, setMenuState] = useState<MenuState>({ x: 50, y: 80, width: 420, height: 52 });
   const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,13 +64,15 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   
   const transformWrapperRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const pantinRefs = useRef<{[key: string]: SVGSVGElement | null}>({});
+  const objectWrapperRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
+  const attachmentRefs = useRef<{[key: string]: SVGGElement | null}>({});
 
   useEffect(() => {
     try {
-      const savedStateJSON = localStorage.getItem('canvasState');
+      const savedStateJSON = localStorage.getItem('canvasLocalState');
       if (savedStateJSON) {
-        const savedState: CanvasState = JSON.parse(savedStateJSON);
-        setSvgObjects(savedState.svgObjects || []);
+        const savedState: CanvasLocalState = JSON.parse(savedStateJSON);
         setBackgroundImageUrl(savedState.backgroundImageUrl || null);
         setCanvasDimensions(savedState.canvasDimensions || null);
         setTransformState(savedState.transformState || { scale: 1, positionX: 0, positionY: 0 });
@@ -77,26 +90,24 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   useEffect(() => {
     if (transformState === null) return;
     try {
-      const stateToSave: CanvasState = {
-        svgObjects,
+      const stateToSave: CanvasLocalState = {
         backgroundImageUrl,
         canvasDimensions,
         transformState,
         menuState,
       };
-      localStorage.setItem('canvasState', JSON.stringify(stateToSave));
+      localStorage.setItem('canvasLocalState', JSON.stringify(stateToSave));
     } catch (err) {
       console.error("Failed to save canvas state to localStorage", err);
-      setError("Could not save progress.");
     }
-  }, [svgObjects, backgroundImageUrl, canvasDimensions, transformState, menuState]);
+  }, [backgroundImageUrl, canvasDimensions, transformState, menuState]);
 
   const deleteSelectedObject = useCallback(() => {
     if (!selectedObjectId) return;
-    setSvgObjects(prev => prev.filter(obj => obj.id !== selectedObjectId));
+    onDeleteObject(selectedObjectId);
     setSelectedObjectId(null);
     onObjectSelect(null);
-  }, [selectedObjectId, onObjectSelect]);
+  }, [selectedObjectId, onObjectSelect, onDeleteObject]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -111,51 +122,25 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [deleteSelectedObject]);
-
-  const processSvg = useCallback((svgString: string): string => {
-    return svgString.replace(/<svg[^>]*>/, match => 
-      match.replace(/ width="[^"]*"/, '').replace(/ height="[^"]*"/, '')
-    );
-  }, []);
-
-  const getSvgDimensions = (svgString: string): { width: number; height: number } => {
-    const viewBoxMatch = svgString.match(/viewBox="([^"]*)"/);
-    if (viewBoxMatch) {
-      const parts = viewBoxMatch[1].split(' ');
-      if (parts.length === 4) return { width: parseFloat(parts[2]), height: parseFloat(parts[3]) };
-    }
-    const widthMatch = svgString.match(/width="([^"]*)"/);
-    const heightMatch = svgString.match(/height="([^"]*)"/);
-    if (widthMatch && heightMatch && !widthMatch[1].includes('%') && !heightMatch[1].includes('%')) {
-      return { width: parseFloat(widthMatch[1]), height: parseFloat(heightMatch[1]) };
-    }
-    return { width: 200, height: 200 }; // Fallback
-  };
   
   const fitView = useCallback(() => {
     const transformWrapper = transformWrapperRef.current;
     const container = containerRef.current;
     if (!transformWrapper || !canvasDimensions || !container) return;
-
     const { setTransform } = transformWrapper;
-
     const viewRect = container.getBoundingClientRect();
-
     const contentWidth = canvasDimensions.width;
     const contentHeight = canvasDimensions.height;
     if (contentWidth <= 0 || contentHeight <= 0) return;
-
     const scaleX = viewRect.width / contentWidth;
     const scaleY = viewRect.height / contentHeight;
     const newScale = Math.min(scaleX, scaleY);
-
     const newPositionX = (viewRect.width - contentWidth * newScale) / 2;
     const newPositionY = (viewRect.height - contentHeight * newScale) / 2;
-
     setTransform(newPositionX, newPositionY, newScale);
   }, [canvasDimensions]);
 
-  const addObject = useCallback((svgContent: string, category: AssetCategory) => {
+  const spawnAndAddObject = useCallback((svgContent: string, category: AssetCategory) => {
     const viewportEl = containerRef.current;
     if (!viewportEl || !transformState) return;
     
@@ -173,10 +158,9 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       ...dimensions,
       category,
       flipped: false,
-      ...(category === 'pantins' && { articulation: {} }),
     };
-    setSvgObjects(prev => [...prev, newSvg]);
-  }, [processSvg, transformState]);
+    onAddObject(newSvg);
+  }, [transformState, onAddObject]);
 
   const setBackground = useCallback((imageUrl: string) => {
     setError(null);
@@ -192,17 +176,101 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     img.src = imageUrl;
   }, [fitView]);
 
+  const calculateAndSetAttachment = (childId: string, parentId: string, limbId: string) => {
+    const childWrapperElement = objectWrapperRefs.current[childId];
+    const parentPantinSvg = pantinRefs.current[parentId];
+
+    if (!childWrapperElement || !parentPantinSvg) {
+        console.error("Could not find elements for attachment calculation");
+        return;
+    }
+
+    const childSvgElement = childWrapperElement.querySelector('svg');
+    if (!childSvgElement) {
+        console.error(`Could not find SVG inside child object wrapper #${childId}`);
+        return;
+    }
+
+    const limbElement = parentPantinSvg.querySelector(`#${limbId}`);
+    if (!limbElement) {
+        console.error(`Could not find limb #${limbId} in parent`);
+        return;
+    }
+
+    const childMatrix = childSvgElement.getScreenCTM();
+    const limbMatrix = (limbElement as SVGGraphicsElement).getScreenCTM();
+
+    if (!childMatrix || !limbMatrix) {
+        console.error("Could not get CTM for elements");
+        return;
+    }
+
+    const relativeMatrix = limbMatrix.inverse().multiply(childMatrix);
+    const { a, b, c, d, e, f } = relativeMatrix;
+    const transformString = `matrix(${a}, ${b}, ${c}, ${d}, ${e}, ${f})`;
+
+    onUpdateObject(childId, { 
+        attachmentInfo: { parentId, limbId, transform: transformString },
+        x: 0, // Reset position as it's now relative
+        y: 0,
+    });
+  };
+
+  const calculateAndDetachObject = (childId: string) => {
+    const attachedElement = attachmentRefs.current[childId];
+    const childObject = svgObjects.find(o => o.id === childId);
+
+    if (!attachedElement || !childObject || !transformState) {
+        console.error("Could not find elements for detachment calculation");
+        return;
+    }
+
+    const container = containerRef.current;
+    if (!container) {
+        console.error("Could not find canvas container for detachment calculation");
+        return;
+    }
+
+    // Use the element's on-screen bounding box to preserve visual position
+    const rect = (attachedElement as Element).getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+
+    // Convert from screen pixels to canvas-space coordinates using the visual center
+    // Then place the standalone wrapper so its center matches, reducing rounding drift
+    const centerScreenX = rect.left + rect.width / 2;
+    const centerScreenY = rect.top + rect.height / 2;
+    const centerCanvasX = (centerScreenX - containerRect.left - transformState.positionX) / transformState.scale;
+    const centerCanvasY = (centerScreenY - containerRect.top - transformState.positionY) / transformState.scale;
+
+    // Translate from center to top-left of the standalone object's wrapper
+    const newX = Math.round(centerCanvasX - childObject.width / 2);
+    const newY = Math.round(centerCanvasY - childObject.height / 2);
+
+    // Extract current rotation angle from the element's CTM so we preserve orientation
+    let newRotation: number | undefined = undefined;
+    const worldMatrix = (attachedElement as SVGGraphicsElement).getScreenCTM?.();
+    if (worldMatrix) {
+        const angleRad = Math.atan2(worldMatrix.b, worldMatrix.a);
+        let angleDeg = angleRad * 180 / Math.PI;
+        // Normalize to [-180, 180)
+        angleDeg = ((angleDeg + 180) % 360 + 360) % 360 - 180;
+        newRotation = Math.round(angleDeg);
+    }
+
+    onUpdateObject(childId, {
+        attachmentInfo: undefined,
+        x: newX,
+        y: newY,
+        rotation: newRotation,
+    });
+  };
+
   useImperativeHandle(ref, () => ({
-    addObject: addObject,
+    spawnAndAddObject: spawnAndAddObject,
     setBackground: setBackground,
     fitView: fitView,
-    updateObject: (id: string, newProps: Partial<SvgObject>) => {
-      setSvgObjects(prev =>
-        prev.map(obj =>
-          obj.id === id ? { ...obj, ...newProps } : obj
-        )
-      );
-    },
+    calculateAndSetAttachment: calculateAndSetAttachment,
+    calculateAndDetachObject: calculateAndDetachObject,
   }));
 
   const handleFileDrop = useCallback((file: File) => {
@@ -214,13 +282,13 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        addObject(text, 'objets'); // Default to 'objets' for dropped SVGs
+        spawnAndAddObject(text, 'objets');
       };
       reader.readAsText(file);
     } else {
       setError('Invalid file type. Please drop a PNG or SVG file.');
     }
-  }, [addObject, setBackground]);
+  }, [spawnAndAddObject, setBackground]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -232,16 +300,15 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
     setIsObjectInteracting(false);
-    setSvgObjects(prev =>
-        prev.map(obj => (obj.id === id ? { ...obj, x: d.x, y: d.y } : obj))
-    );
+    onUpdateObject(id, { x: d.x, y: d.y });
   };
   
-  // This effect safely synchronizes the selected object state with the parent component.
   useEffect(() => {
     if (selectedObjectId) {
         const selected = svgObjects.find(obj => obj.id === selectedObjectId);
         onObjectSelect(selected || null);
+    } else {
+        onObjectSelect(null);
     }
   }, [svgObjects, selectedObjectId, onObjectSelect]);
 
@@ -258,8 +325,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     }
   }, [handleFileDrop]);
   
-  const resetCanvas = () => {
-    setSvgObjects([]);
+  const handleReset = () => {
+    onResetCanvas();
     setBackgroundImageUrl(null);
     setCanvasDimensions(null);
     setError(null);
@@ -324,7 +391,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         <>
             <div className="reset-button-container">
                 {hasContent && (
-                     <button onClick={resetCanvas} className="reset-button" aria-label="Reset Canvas">
+                     <button onClick={handleReset} className="reset-button" aria-label="Reset Canvas">
                         <TrashIcon />
                     </button>
                 )}
@@ -336,9 +403,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                 className={`canvas-area ${!hasContent ? 'empty' : ''} ${isDragging ? 'dragging' : ''}`}
                 style={canvasDimensions ? { width: `${canvasDimensions.width}px`, height: `${canvasDimensions.height}px`, backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : 'none' } : { width: '100%', height: '100%' }}
               >
-                {/* canvas fills parent when no explicit dimensions */}
-                
-                {svgObjects.map(obj => (
+                {svgObjects.filter(obj => !obj.attachmentInfo).map(obj => (
                   <Rnd
                     key={obj.id}
                     scale={transformState.scale}
@@ -350,44 +415,47 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                       e.stopPropagation();
                       handleSelectObject(obj);
                     }}
+                    onContextMenu={(e) => onObjectContextMenu(e, obj.id)}
                     onDragStart={() => setIsObjectInteracting(true)}
                     onDragStop={(_, d) => handleDragStop(obj.id, d)}
                     onResizeStart={() => setIsObjectInteracting(true)}
                     onResizeStop={(_, __, ref, ___, position) => {
                       setIsObjectInteracting(false);
-                      setSvgObjects(prev => prev.map(o => {
-                          if (o.id === obj.id) {
-                            return {
-                              ...o,
-                              width: parseInt(ref.style.width, 10),
-                              height: parseInt(ref.style.height, 10),
-                              ...position,
-                            };
-                          }
-                          return o;
-                        }));
+                      onUpdateObject(obj.id, {
+                        width: parseInt(ref.style.width, 10),
+                        height: parseInt(ref.style.height, 10),
+                        ...position,
+                      });
                     }}
                     bounds="parent"
                     className={`resizable-object ${selectedObjectId === obj.id ? 'selected' : ''}`}
                   >
-                   <div style={{ width: '100%', height: '100%' }}>
+                   <div 
+                      id={obj.id} 
+                      style={{ width: '100%', height: '100%' }} 
+                      ref={el => { objectWrapperRefs.current[obj.id] = el; }}
+                    >
                     {obj.category === 'pantins' ? (
                         <Pantin 
                           object={obj} 
+                          svgObjects={svgObjects}
+                          attachmentRefs={attachmentRefs}
                           rotateMode={interactionMode === 'rotate'}
                           onInteractionStart={() => setIsObjectInteracting(true)}
                           onInteractionEnd={() => setIsObjectInteracting(false)}
                           onArticulationChange={(partName, angle) => {
-                            setSvgObjects(prev => prev.map(o => {
-                              if (o.id !== obj.id) return o;
-                              const articulation = { ...(o.articulation || {}), [partName]: angle };
-                              return { ...o, articulation };
-                            }));
+                            const currentArticulation = obj.articulation || {};
+                            onUpdateObject(obj.id, { 
+                                articulation: { ...currentArticulation, [partName]: angle } 
+                            });
                           }}
+                          onAttachedObjectContextMenu={(e, id) => onObjectContextMenu(e as any, id)}
+                          ref={el => { pantinRefs.current[obj.id] = el; }}
                         />
                       ) : (
                         <div
                           className="pantin-container"
+                          style={obj.rotation !== undefined ? { width: '100%', height: '100%', transform: `rotate(${obj.rotation}deg)`, transformOrigin: 'center center' } : { width: '100%', height: '100%' }}
                           dangerouslySetInnerHTML={{ __html: obj.content.replace(/<svg[^>]*>/, '$& style="width: 100%; height: 100%;"') }}
                         />
                       )}

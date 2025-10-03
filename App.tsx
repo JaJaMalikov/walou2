@@ -6,6 +6,7 @@ import { ResizeHandle } from './components/ResizeHandle';
 import { useResizable } from './components/icons/useResizable';
 import { AssetPanel } from './components/AssetPanel';
 import { InspectorPanel } from './components/InspectorPanel';
+import { ContextMenu } from './components/ContextMenu';
 import type { CanvasRef, SvgObject, AssetCategory } from './types';
 import { RowsIcon } from './components/icons';
 
@@ -40,8 +41,57 @@ const loadUILayout = (): UiLayout => {
 const App: React.FC = () => {
   const [initialLayout] = useState(loadUILayout);
   const canvasRef = useRef<CanvasRef>(null);
-  
+  const isInitialMount = useRef(true);
+
+  const [svgObjects, setSvgObjects] = useState<SvgObject[]>([]);
   const [selectedObject, setSelectedObject] = useState<SvgObject | null>(null);
+  const [contextMenuState, setContextMenuState] = useState<{ x: number, y: number, targetId: string | null }>({ x: 0, y: 0, targetId: null });
+
+  useEffect(() => {
+    try {
+      const savedStateJSON = localStorage.getItem('canvasState');
+      if (savedStateJSON) {
+        const savedState = JSON.parse(savedStateJSON);
+        setSvgObjects(savedState.svgObjects || []);
+      }
+    } catch (err) {
+      console.error("Failed to load canvas state from localStorage", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+        isInitialMount.current = false;
+        return;
+    }
+    try {
+      const stateToSave = {
+        svgObjects,
+      };
+      localStorage.setItem('canvasState', JSON.stringify(stateToSave));
+    } catch (err) {
+      console.error("Failed to save canvas state to localStorage", err);
+    }
+  }, [svgObjects]);
+
+
+  const handleObjectContextMenu = (e: React.MouseEvent, objectId: string) => {
+    e.preventDefault();
+    setContextMenuState({ x: e.clientX, y: e.clientY, targetId: objectId });
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenuState({ x: 0, y: 0, targetId: null });
+  };
+
+  const handleAttachObject = (childId: string, parentId: string, limbId: string) => {
+    canvasRef.current?.calculateAndSetAttachment(childId, parentId, limbId);
+    handleCloseContextMenu();
+  };
+
+  const handleDetachObject = (childId: string) => {
+    canvasRef.current?.calculateAndDetachObject(childId);
+  };
 
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
@@ -80,7 +130,6 @@ const App: React.FC = () => {
           dockHeight,
         };
         localStorage.setItem(UI_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
-        // after resize settles, fit the view to the available space
         canvasRef.current?.fitView();
       } catch (error) {
         console.error("Failed to save UI layout to localStorage", error);
@@ -124,8 +173,12 @@ const App: React.FC = () => {
     };
   }, []);
 
+  const onAddObject = (newObject: SvgObject) => {
+    setSvgObjects(prev => [...prev, newObject]);
+  };
+
   const handleAddObject = (svgContent: string, category: AssetCategory) => {
-    canvasRef.current?.addObject(svgContent, category);
+    canvasRef.current?.spawnAndAddObject(svgContent, category);
   };
   
   const handleSetBackground = (imageUrl: string) => {
@@ -133,26 +186,37 @@ const App: React.FC = () => {
   };
   
   const handleUpdateObject = (id: string, newProps: Partial<SvgObject>) => {
-    const currentObject = selectedObject?.id === id ? selectedObject : null;
-    let finalProps = newProps;
-
-    // Deep merge articulation properties
-    if (newProps.articulation && currentObject?.articulation) {
-        finalProps = {
-            ...newProps,
-            articulation: {
-                ...currentObject.articulation,
-                ...newProps.articulation,
-            },
-        };
-    }
+    setSvgObjects(prevObjects =>
+      prevObjects.map(obj =>
+        obj.id === id ? { ...obj, ...newProps } : obj
+      )
+    );
     
-    canvasRef.current?.updateObject(id, finalProps);
-    setSelectedObject(prev => (prev && prev.id === id) ? { ...prev, ...finalProps } : prev);
+    const currentObject = selectedObject?.id === id ? selectedObject : null;
+    if (currentObject) {
+        let finalProps = newProps;
+        if (newProps.articulation && currentObject.articulation) {
+            finalProps = {
+                ...newProps,
+                articulation: {
+                    ...currentObject.articulation,
+                    ...newProps.articulation,
+                },
+            };
+        }
+        setSelectedObject(prev => (prev && prev.id === id) ? { ...prev, ...finalProps } : prev);
+    }
+  };
+
+  const handleDeleteObject = (id: string) => {
+    setSvgObjects(prev => prev.filter(obj => obj.id !== id));
+  };
+
+  const handleResetCanvas = () => {
+    setSvgObjects([]);
   };
 
   const scheduleFitView = () => {
-    // allow layout to settle before fitting
     requestAnimationFrame(() => canvasRef.current?.fitView());
   };
 
@@ -182,7 +246,8 @@ const App: React.FC = () => {
 
         <div className="canvas-wrapper">
           <Canvas 
-            ref={canvasRef} 
+            ref={canvasRef}
+            svgObjects={svgObjects}
             leftPanelOpen={leftPanelOpen}
             rightPanelOpen={rightPanelOpen}
             dockOpen={dockOpen}
@@ -190,13 +255,23 @@ const App: React.FC = () => {
             onToggleRightPanel={handleToggleRightPanel}
             onToggleDock={handleToggleDock}
             onObjectSelect={setSelectedObject}
+            onObjectContextMenu={handleObjectContextMenu}
+            onAddObject={onAddObject}
+            onUpdateObject={handleUpdateObject}
+            onDeleteObject={handleDeleteObject}
+            onResetCanvas={handleResetCanvas}
           />
         </div>
 
         <ResizeHandle isVisible={rightPanelOpen} {...rightResizeHandleProps} />
         
         <SidePanel side="right" isOpen={rightPanelOpen} width={rightPanelWidth}>
-           <InspectorPanel selectedObject={selectedObject} onUpdateObject={handleUpdateObject} />
+           <InspectorPanel 
+            selectedObject={selectedObject} 
+            svgObjects={svgObjects}
+            onUpdateObject={handleUpdateObject} 
+            onDetachObject={handleDetachObject}
+          />
         </SidePanel>
       </main>
 
@@ -213,6 +288,21 @@ const App: React.FC = () => {
             </div>
         </div>
       </Dock>
+
+      {contextMenuState.targetId && (
+        <>
+          <div className="context-menu-backdrop" onClick={handleCloseContextMenu} onContextMenu={handleCloseContextMenu} />
+          <ContextMenu
+            x={contextMenuState.x}
+            y={contextMenuState.y}
+            targetId={contextMenuState.targetId}
+            svgObjects={svgObjects}
+            onAttach={handleAttachObject}
+            onDetach={handleDetachObject}
+            onClose={handleCloseContextMenu}
+          />
+        </>
+      )}
     </div>
   );
 };

@@ -1,18 +1,15 @@
 import React from 'react';
 import type { SvgObject } from '../types';
+import { ARTICULABLE_PARTS } from '../types';
 import { ChevronsRightLeftIcon } from './icons';
 
 interface InspectorPanelProps {
   selectedObject: SvgObject | null;
+  svgObjects: SvgObject[];
   onUpdateObject: (id: string, newProps: Partial<SvgObject>) => void;
+  onDetachObject: (childId: string) => void;
 }
 
-const ARTICULABLE_PARTS = [
-    'tete', 'haut_bras_droite', 'avant_bras_droite', 'main_droite',
-    'haut_bras_gauche', 'avant_bras_gauche', 'main_gauche',
-    'cuisse_droite', 'tibia_droite', 'pied_droite',
-    'cuisse_gauche', 'tibia_gauche', 'pied_gauche',
-];
 
 const MIRROR_MAP: { [key: string]: string } = {
     'haut_bras_droite': 'haut_bras_gauche', 'haut_bras_gauche': 'haut_bras_droite',
@@ -56,8 +53,10 @@ const ArticulationSlider: React.FC<{ partName: string; value: number; onChange: 
 );
 
 
-export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, onUpdateObject }) => {
+export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, svgObjects, onUpdateObject, onDetachObject }) => {
   
+  const attachedChildren = selectedObject ? svgObjects.filter(obj => obj.attachmentInfo?.parentId === selectedObject.id) : [];
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedObject) return;
     const { name, value } = e.target;
@@ -140,6 +139,20 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                             />
                         )
                     })}
+                </div>
+            </div>
+        )}
+
+        {selectedObject && selectedObject.category === 'pantins' && attachedChildren.length > 0 && (
+            <div className="inspector-section">
+                <label className="inspector-label">Attached Objects</label>
+                <div className="inspector-group">
+                    {attachedChildren.map(child => (
+                        <div key={child.id} className="attached-object-row">
+                            <span>{child.id}</span>
+                            <button onClick={() => onDetachObject(child.id)} className="detach-button">Detach</button>
+                        </div>
+                    ))}
                 </div>
             </div>
         )}

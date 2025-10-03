@@ -1,21 +1,17 @@
-import React, { useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useRef, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import type { SvgObject } from '../types';
+import { ARTICULABLE_PARTS } from '../types';
 
 interface PantinProps {
   object: SvgObject;
+  svgObjects: SvgObject[]; // All objects on the scene
+  attachmentRefs: React.MutableRefObject<{[key: string]: SVGGElement | null}>;
   rotateMode?: boolean;
   onArticulationChange?: (partName: string, angle: number) => void;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
+  onAttachedObjectContextMenu?: (e: React.MouseEvent, objectId: string) => void;
 }
-
-// Defines the parent-child relationships for rotation calculation
-const ARTICULABLE_PARTS = [
-    'tete', 'haut_bras_droite', 'avant_bras_droite', 'main_droite',
-    'haut_bras_gauche', 'avant_bras_gauche', 'main_gauche',
-    'cuisse_droite', 'tibia_droite', 'pied_droite',
-    'cuisse_gauche', 'tibia_gauche', 'pied_gauche',
-];
 
 interface SvgNode {
     type: string;
@@ -35,8 +31,19 @@ const findPivotCoords = (el: Element | null): string | null => {
     return `${cx}px ${cy}px`;
 };
 
-// Recursive component to render SVG nodes
-const SvgPart: React.FC<{ node: SvgNode; articulation: { [key: string]: number }, pivots: { [key: string]: string } }> = ({ node, articulation, pivots }) => {
+const getSvgContentOnly = (svgString: string): string => {
+    const match = svgString.match(/<svg[^>]*>([\s\S]*)<\/svg>/i);
+    return match ? match[1] : svgString;
+};
+
+const SvgPart: React.FC<{ 
+    node: SvgNode; 
+    articulation: { [key: string]: number }; 
+    pivots: { [key: string]: string };
+    attachedChildren: { [limbId: string]: SvgObject[] };
+    attachmentRefs: React.MutableRefObject<{[key: string]: SVGGElement | null}>;
+    onAttachmentContextMenu?: (e: React.MouseEvent, objectId: string) => void;
+}> = ({ node, articulation, pivots, attachedChildren, attachmentRefs, onAttachmentContextMenu }) => {
     const { type, props, children } = node;
     const style: React.CSSProperties = { ...props.style };
 
@@ -52,15 +59,53 @@ const SvgPart: React.FC<{ node: SvgNode; articulation: { [key: string]: number }
         style.transform = `rotate(${angle}deg)`;
     }
 
+    const childrenToRender = children.map((child, index) => 
+        <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} attachedChildren={attachedChildren} attachmentRefs={attachmentRefs} onAttachmentContextMenu={onAttachmentContextMenu} />
+    );
+
+    const attachments = partId ? attachedChildren[partId] : undefined;
+    if (attachments) {
+        attachments.forEach(att => {
+            if (!att.attachmentInfo) return;
+            childrenToRender.push(
+                <g 
+                    key={att.id} 
+                    transform={att.attachmentInfo.transform}
+                    ref={el => { attachmentRefs.current[att.id] = el; }}
+                    onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); onAttachmentContextMenu && onAttachmentContextMenu(e, att.id); }}
+                >
+                    <g dangerouslySetInnerHTML={{ __html: getSvgContentOnly(att.content) }} />
+                </g>
+            );
+        });
+    }
+
     return React.createElement(
         type,
         { ...props, style },
-        children.map((child, index) => <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} />)
+        ...childrenToRender
     );
 };
 
-export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onArticulationChange, onInteractionStart, onInteractionEnd }) => {
-    const svgRef = useRef<SVGSVGElement>(null);
+const PantinComponent: React.ForwardRefRenderFunction<SVGSVGElement, PantinProps> = 
+  ({ object, svgObjects, attachmentRefs, rotateMode = false, onArticulationChange, onInteractionStart, onInteractionEnd, onAttachedObjectContextMenu }, ref) => {
+
+    const svgInternalRef = useRef<SVGSVGElement>(null);
+    useImperativeHandle(ref, () => svgInternalRef.current as SVGSVGElement, []);
+
+    const attachedChildren = useMemo(() => {
+        const children: { [limbId: string]: SvgObject[] } = {};
+        svgObjects.forEach(obj => {
+            if (obj.attachmentInfo?.parentId === object.id) {
+                const limbId = obj.attachmentInfo.limbId;
+                if (!children[limbId]) {
+                    children[limbId] = [];
+                }
+                children[limbId].push(obj);
+            }
+        });
+        return children;
+    }, [svgObjects, object.id]);
 
     const parsedSvg = useMemo(() => {
         if (!object.content) return null;
@@ -75,7 +120,6 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
                 if (attr.name === 'class') {
                     props.className = attr.value;
                 } else if (attr.name.includes('-')) {
-                    // Convert kebab-case to camelCase for React style props, e.g., fill-rule -> fillRule
                     const camelCaseName = attr.name.replace(/-([a-z])/g, g => g[1].toUpperCase());
                     props[camelCaseName] = attr.value;
                 } else {
@@ -104,7 +148,7 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
     }, [object.content]);
 
     useEffect(() => {
-        const svg = svgRef.current;
+        const svg = svgInternalRef.current;
         if (!svg) return;
 
         const sendToBack = (el: Element | null) => {
@@ -113,14 +157,12 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
             }
         };
 
-        // Z-order adjustments on mount
         ["poignet_droite", "poignet_gauche", "hanche_droite", "hanche_gauche"].forEach((id) => {
             const node = svg.querySelector(`#${id}`);
             if (node) sendToBack(node);
         });
-    }, [parsedSvg, object.flipped]); // Re-apply when SVG content or flip state changes
+    }, [parsedSvg, object.flipped]);
 
-    // DnD rotation handlers
     const activePartRef = useRef<string | null>(null);
     const baseAngleRef = useRef<number>(0);
     const rotatingRef = useRef<boolean>(false);
@@ -136,7 +178,8 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
 
     const getPartFromEvent = (target: Element | null): string | null => {
         let el: Element | null = target;
-        while (el && el !== svgRef.current) {
+        const svg = svgInternalRef.current;
+        while (el && el !== svg) {
             const id = (el as Element).id;
             if (id && ARTICULABLE_PARTS.includes(id)) return id;
             el = el.parentElement;
@@ -145,7 +188,7 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
     };
 
     const clientToSvgPoint = (clientX: number, clientY: number) => {
-        const svg = svgRef.current!;
+        const svg = svgInternalRef.current!;
         const pt = svg.createSVGPoint();
         pt.x = clientX;
         pt.y = clientY;
@@ -157,7 +200,7 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
     };
 
     const findPivotForPart = (partId: string): { x: number; y: number } | null => {
-        const svg = svgRef.current;
+        const svg = svgInternalRef.current;
         if (!svg) return null;
         const partNode = svg.querySelector(`#${partId}`);
         const pivotCircle = partNode?.parentElement?.querySelector('circle.pivot') as SVGCircleElement | null;
@@ -175,7 +218,7 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
     };
 
     const handlePointerMove = useCallback((e: PointerEvent) => {
-        if (!rotatingRef.current || !svgRef.current) return;
+        if (!rotatingRef.current) return;
         const activePart = activePartRef.current;
         if (!activePart) return;
         const pivot = findPivotForPart(activePart);
@@ -183,9 +226,7 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
         const { x, y } = clientToSvgPoint(e.clientX, e.clientY);
         const ang = Math.atan2(y - pivot.y, x - pivot.x) * 180 / Math.PI;
         const newAngle = ang + baseAngleRef.current;
-        // normalize to [-180,180]
         let final = ((newAngle + 180) % 360 + 360) % 360 - 180;
-        // handle flip + mirror mapping for storage
         const isFlipped = !!object.flipped;
         const controlledPart = (isFlipped && MIRROR_MAP[activePart]) ? MIRROR_MAP[activePart] : activePart;
         if (isFlipped) final = -final;
@@ -202,12 +243,10 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
         window.removeEventListener('pointercancel', stopRotation);
     }, [handlePointerMove, onInteractionEnd]);
 
-    // Actual event handler attaching with rotateMode awareness
     const attachHandlers = useCallback(() => {
-        const svg = svgRef.current;
+        const svg = svgInternalRef.current;
         if (!svg) return;
         const onPointerDown = (e: PointerEvent) => {
-            // Only left button
             if (e.button !== 0) return;
             if (!rotateMode) return;
             const target = e.target as Element | null;
@@ -220,7 +259,6 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
 
             const { x, y } = clientToSvgPoint(e.clientX, e.clientY);
             const startAng = Math.atan2(y - pivot.y, x - pivot.x) * 180 / Math.PI;
-            // current stored angle for controlled part
             const isFlipped = !!object.flipped;
             const ctrl = (isFlipped && MIRROR_MAP[part]) ? MIRROR_MAP[part] : part;
             let current = (object.articulation && object.articulation[ctrl]) || 0;
@@ -253,7 +291,6 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
     const { root, pivots } = parsedSvg;
     const articulation = object.articulation || {};
 
-    // compute flip transform inside SVG to keep pointer math consistent
     let flipTransform: string | undefined;
     if (object.flipped) {
         const vb = (root.props && root.props.viewBox) ? String(root.props.viewBox) : undefined;
@@ -265,7 +302,6 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
             }
         }
         if (!w) {
-            // fallback: try width attribute
             const widthAttr = root.props && (root.props.width as string | number | undefined);
             if (typeof widthAttr === 'string') w = parseFloat(widthAttr);
             if (typeof widthAttr === 'number') w = widthAttr;
@@ -273,26 +309,27 @@ export const Pantin: React.FC<PantinProps> = ({ object, rotateMode = false, onAr
         if (w && !Number.isNaN(w)) {
             flipTransform = `translate(${w},0) scale(-1,1)`;
         } else {
-            // best-effort flip around origin
             flipTransform = `scale(-1,1)`;
         }
     }
 
     return (
-        <svg ref={svgRef} {...root.props} style={{ overflow: 'visible' }} className="pantin-container">
+        <svg ref={svgInternalRef} {...root.props} style={{ overflow: 'visible' }} className="pantin-container">
             {flipTransform ? (
                 <g transform={flipTransform}>
                     {root.children.map((child, index) => (
-                        <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} />
+                        <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} attachedChildren={attachedChildren} attachmentRefs={attachmentRefs} onAttachmentContextMenu={onAttachedObjectContextMenu} />
                     ))}
                 </g>
              ) : (
                 <>
                     {root.children.map((child, index) => (
-                        <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} />
+                        <SvgPart key={index} node={child} articulation={articulation} pivots={pivots} attachedChildren={attachedChildren} attachmentRefs={attachmentRefs} onAttachmentContextMenu={onAttachedObjectContextMenu} />
                     ))}
                 </>
              )}
         </svg>
     );
 };
+
+export const Pantin = forwardRef(PantinComponent);
