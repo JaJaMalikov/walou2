@@ -289,6 +289,7 @@ const App: React.FC = () => {
             svgObjects={svgObjects}
             onUpdateObject={handleUpdateObject} 
             onDetachObject={handleDetachObject}
+            compact={rightPanelWidth <= 220}
           />
         </SidePanel>
       </main>
@@ -318,6 +319,8 @@ const App: React.FC = () => {
             onAttach={handleAttachObject}
             onDetach={handleDetachObject}
             onClose={handleCloseContextMenu}
+            onUpdateObject={handleUpdateObject}
+            onDelete={handleDeleteObject}
           />
         </>
       )}

@@ -18,6 +18,10 @@ export interface SvgObject {
   width: number;
   height: number;
   category: AssetCategory;
+  name?: string;
+  zIndex?: number;
+  locked?: boolean;
+  hidden?: boolean;
   articulation?: { [key: string]: number }; // e.g. { tete: -15, bras_gauche: 20 }
   flipped?: boolean;
   rotation?: number; // degrees, for generic objects

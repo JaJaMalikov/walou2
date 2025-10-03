@@ -96,7 +96,7 @@ const PantinComponent: React.ForwardRefRenderFunction<SVGSVGElement, PantinProps
     const attachedChildren = useMemo(() => {
         const children: { [limbId: string]: SvgObject[] } = {};
         svgObjects.forEach(obj => {
-            if (obj.attachmentInfo?.parentId === object.id) {
+            if (obj.attachmentInfo?.parentId === object.id && !obj.hidden) {
                 const limbId = obj.attachmentInfo.limbId;
                 if (!children[limbId]) {
                     children[limbId] = [];

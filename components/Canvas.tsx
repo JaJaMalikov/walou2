@@ -65,6 +65,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   
   const transformWrapperRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const transformStateRef = useRef<typeof transformState>(null);
   const pantinRefs = useRef<{[key: string]: SVGSVGElement | null}>({});
   const objectWrapperRefs = useRef<{[key: string]: HTMLDivElement | null}>({});
   const attachmentRefs = useRef<{[key: string]: SVGGElement | null}>({});
@@ -157,7 +158,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     const newScale = Math.min(scaleX, scaleY);
     const newPositionX = (viewRect.width - contentWidth * newScale) / 2;
     const newPositionY = (viewRect.height - contentHeight * newScale) / 2;
-    setTransform(newPositionX, newPositionY, newScale);
+    // Apply instantly (no animation)
+    setTransform(newPositionX, newPositionY, newScale, 0 as any);
   }, [canvasDimensions]);
 
   const spawnAndAddObject = useCallback((svgContent: string, category: AssetCategory) => {
@@ -177,6 +179,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     const centerX = (viewRect.width / 2 - transformState.positionX) / transformState.scale;
     const centerY = (viewRect.height / 2 - transformState.positionY) / transformState.scale;
 
+    const maxZ = Math.max(0, ...svgObjects.map(o => (o.zIndex ?? 0)));
     const newSvg: SvgObject = {
       id: `svg-${Date.now()}`,
       content: processSvg(svgContent),
@@ -184,10 +187,11 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       y: centerY - dimensions.height / 2,
       ...dimensions,
       category,
+      zIndex: maxZ + 1,
       flipped: false,
     };
     onAddObject(newSvg);
-  }, [transformState, onAddObject, backgroundImageUrl, canvasDimensions]);
+  }, [transformState, onAddObject, backgroundImageUrl, canvasDimensions, svgObjects]);
 
   const setBackground = useCallback((imageUrl: string) => {
     setError(null);
@@ -383,11 +387,91 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   }
 
   const hasContent = svgObjects.length > 0 || backgroundImageUrl;
-  
+
+  // Keep a ref of the latest transform state for smooth interactions
+  useEffect(() => { transformStateRef.current = transformState; }, [transformState]);
+
+  // Custom wheel handling: Ctrl+wheel zooms, plain wheel pans (with RAF smoothing)
+  useEffect(() => {
+    const el = containerRef.current;
+    const wrapper = transformWrapperRef.current;
+    if (!el || !wrapper) return;
+
+    let rafId: number | null = null;
+    let accPanX = 0;
+    let accPanY = 0;
+    let accZoomLog = 0; // accumulate in log space
+    let zoomCx = 0;
+    let zoomCy = 0;
+
+    const ZOOM_SENSITIVITY = 0.0010; // lower = less sensitive
+    const PAN_SENSITIVITY = 0.7; // lower = less sensitive
+
+    const applyFrame = () => {
+      rafId = null;
+      const ts = transformStateRef.current;
+      if (!ts) return;
+      let { positionX, positionY, scale } = ts;
+
+      if (accZoomLog !== 0) {
+        const rect = el.getBoundingClientRect();
+        const px = zoomCx - rect.left;
+        const py = zoomCy - rect.top;
+        const worldX = (px - positionX) / scale;
+        const worldY = (py - positionY) / scale;
+        const factor = Math.exp(accZoomLog);
+        const targetScale = Math.max(0.05, Math.min(10, scale * factor));
+        positionX = px - worldX * targetScale;
+        positionY = py - worldY * targetScale;
+        scale = targetScale;
+        accZoomLog = 0;
+      }
+
+      if (accPanX !== 0 || accPanY !== 0) {
+        positionX -= accPanX;
+        positionY -= accPanY;
+        accPanX = 0;
+        accPanY = 0;
+      }
+
+      // Apply instantly (no animation)
+      wrapper.setTransform(positionX, positionY, scale, 0 as any);
+    };
+
+    const schedule = () => {
+      if (rafId == null) rafId = window.requestAnimationFrame(applyFrame);
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      if (isObjectInteracting) return; // Don't interfere during object manipulation
+      // Only act within the canvas; prevent page scroll
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+
+      if (e.ctrlKey) {
+        // Accumulate zoom in log space for smoothness
+        accZoomLog += e.deltaY * -ZOOM_SENSITIVITY;
+        zoomCx = e.clientX;
+        zoomCy = e.clientY;
+      } else {
+        // Two-finger scroll pans the scene (accumulate deltas)
+        accPanX += e.deltaX * PAN_SENSITIVITY;
+        accPanY += e.deltaY * PAN_SENSITIVITY;
+      }
+      schedule();
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false, capture: true });
+    return () => {
+      el.removeEventListener('wheel', onWheel as EventListener, true);
+      if (rafId != null) cancelAnimationFrame(rafId);
+    };
+  }, [isObjectInteracting, transformState]);
+
   if (!transformState) return <div className="canvas-container" />;
 
   return (
-    <div ref={containerRef} className="canvas-container">
+    <div ref={containerRef} className="canvas-container" style={{ overscrollBehavior: 'contain' }}>
       <FloatingMenu 
         menuState={menuState}
         onMenuChange={handleMenuChange}
@@ -417,7 +501,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         centerOnInit={true}
         doubleClick={{ disabled: true }}
         centerZoomedOut={false}
-        panning={{ disabled: isObjectInteracting }}
+        wheel={{ disabled: true }}
+        panning={{ disabled: true }}
       >
         <>
             <div className="reset-button-container">
@@ -434,14 +519,18 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                 className={`canvas-area ${!hasContent ? 'empty' : ''}`}
                 style={canvasDimensions ? { width: `${canvasDimensions.width}px`, height: `${canvasDimensions.height}px`, backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : 'none' } : { width: '100%', height: '100%' }}
               >
-                {svgObjects.filter(obj => !obj.attachmentInfo).map(obj => (
+                {svgObjects
+                  .filter(obj => !obj.attachmentInfo && !obj.hidden)
+                  .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
+                  .map(obj => (
                   <Rnd
                     key={obj.id}
                     scale={transformState.scale}
                     size={{ width: obj.width, height: obj.height }}
                     position={{ x: obj.x, y: obj.y }}
-                    disableDragging={interactionMode === 'rotate'}
-                    enableResizing={interactionMode !== 'rotate'}
+                    disableDragging={interactionMode === 'rotate' || !!obj.locked}
+                    enableResizing={interactionMode !== 'rotate' && !obj.locked}
+                    style={{ zIndex: obj.zIndex ?? 0 }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
                       handleSelectObject(obj);
