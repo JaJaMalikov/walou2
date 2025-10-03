@@ -42,4 +42,5 @@ export type CanvasRef = {
   fitView: () => void;
   calculateAndSetAttachment: (childId: string, parentId: string, limbId: string) => void;
   calculateAndDetachObject: (childId: string) => void;
+  hasBackground: () => boolean;
 };

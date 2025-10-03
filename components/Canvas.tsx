@@ -1,7 +1,7 @@
-import React, { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle, useLayoutEffect } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Rnd } from 'react-rnd';
-import { UploadCloudIcon, TrashIcon } from './icons';
+import { TrashIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
 import type { CanvasRef, SvgObject, AssetCategory } from '../types';
 import { Pantin } from './Pantin';
@@ -56,11 +56,12 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   const [canvasDimensions, setCanvasDimensions] = useState<{width: number, height: number} | null>(null);
   const [transformState, setTransformState] = useState<CanvasLocalState['transformState'] | null>(null);
   const [menuState, setMenuState] = useState<MenuState>({ x: 50, y: 80, width: 420, height: 52 });
-  const [isDragging, setIsDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isObjectInteracting, setIsObjectInteracting] = useState(false);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [interactionMode, setInteractionMode] = useState<'select' | 'rotate'>('select');
+  const saveTimerRef = useRef<number | null>(null);
+  const fitTimerRef = useRef<number | null>(null);
   
   const transformWrapperRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -81,26 +82,45 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         setTransformState({ scale: 1, positionX: 0, positionY: 0 });
       }
     } catch (err) {
-      console.error("Failed to load canvas state from localStorage", err);
-      setError("Could not load saved state.");
+      console.error("Échec du chargement de l'état du canvas depuis localStorage", err);
+      setError("Impossible de charger l'état enregistré.");
       setTransformState({ scale: 1, positionX: 0, positionY: 0 });
     }
   }, []);
 
   useEffect(() => {
     if (transformState === null) return;
-    try {
-      const stateToSave: CanvasLocalState = {
-        backgroundImageUrl,
-        canvasDimensions,
-        transformState,
-        menuState,
-      };
-      localStorage.setItem('canvasLocalState', JSON.stringify(stateToSave));
-    } catch (err) {
-      console.error("Failed to save canvas state to localStorage", err);
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current);
     }
+    saveTimerRef.current = window.setTimeout(() => {
+      try {
+        const stateToSave: CanvasLocalState = {
+          backgroundImageUrl,
+          canvasDimensions,
+          transformState,
+          menuState,
+        };
+        localStorage.setItem('canvasLocalState', JSON.stringify(stateToSave));
+      } catch (err) {
+      console.error("Échec de l'enregistrement de l'état du canvas dans localStorage", err);
+      }
+    }, 300);
   }, [backgroundImageUrl, canvasDimensions, transformState, menuState]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!error) return;
+    const t = window.setTimeout(() => setError(null), 3000);
+    return () => window.clearTimeout(t);
+  }, [error]);
 
   const deleteSelectedObject = useCallback(() => {
     if (!selectedObjectId) return;
@@ -141,6 +161,13 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   }, [canvasDimensions]);
 
   const spawnAndAddObject = useCallback((svgContent: string, category: AssetCategory) => {
+    // Prevent adding objects if no background is defined
+    if (!backgroundImageUrl || !canvasDimensions) {
+      console.warn('Background not set. Cannot add objects yet.');
+      setError(prev => prev ?? 'Définissez un décor avant d’ajouter des objets.');
+      return;
+    }
+
     const viewportEl = containerRef.current;
     if (!viewportEl || !transformState) return;
     
@@ -160,7 +187,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       flipped: false,
     };
     onAddObject(newSvg);
-  }, [transformState, onAddObject]);
+  }, [transformState, onAddObject, backgroundImageUrl, canvasDimensions]);
 
   const setBackground = useCallback((imageUrl: string) => {
     setError(null);
@@ -168,13 +195,47 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     img.onload = () => {
       setBackgroundImageUrl(imageUrl);
       setCanvasDimensions({ width: img.naturalWidth, height: img.naturalHeight });
-      setTimeout(fitView, 100);
     };
     img.onerror = () => {
-      setError("Failed to load the background image.");
+      setError("Échec du chargement de l'image de décor.");
     };
     img.src = imageUrl;
   }, [fitView]);
+
+  // After background and dimensions are ready, fit the view deterministically
+  useLayoutEffect(() => {
+    if (backgroundImageUrl && canvasDimensions) {
+      fitView();
+    }
+  }, [backgroundImageUrl, canvasDimensions, fitView]);
+
+  // Observe container resize and trigger fitView when background is set
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const scheduleFit = () => {
+      if (!backgroundImageUrl || !canvasDimensions) return;
+      if (fitTimerRef.current) window.clearTimeout(fitTimerRef.current);
+      fitTimerRef.current = window.setTimeout(() => {
+        fitView();
+      }, 100);
+    };
+
+    const observer = new ResizeObserver(() => {
+      scheduleFit();
+    });
+    observer.observe(el);
+
+    const onWindowResize = () => scheduleFit();
+    window.addEventListener('resize', onWindowResize);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', onWindowResize);
+      if (fitTimerRef.current) window.clearTimeout(fitTimerRef.current);
+    };
+  }, [backgroundImageUrl, canvasDimensions, fitView]);
 
   const calculateAndSetAttachment = (childId: string, parentId: string, limbId: string) => {
     const childWrapperElement = objectWrapperRefs.current[childId];
@@ -271,32 +332,12 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     fitView: fitView,
     calculateAndSetAttachment: calculateAndSetAttachment,
     calculateAndDetachObject: calculateAndDetachObject,
+    hasBackground: () => !!backgroundImageUrl,
   }));
 
-  const handleFileDrop = useCallback((file: File) => {
-    setError(null);
-    if (file.type.startsWith('image/png')) {
-        const fileUrl = URL.createObjectURL(file);
-        setBackground(fileUrl);
-    } else if (file.type === 'image/svg+xml') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        spawnAndAddObject(text, 'objets');
-      };
-      reader.readAsText(file);
-    } else {
-      setError('Invalid file type. Please drop a PNG or SVG file.');
-    }
-  }, [spawnAndAddObject, setBackground]);
+  
 
-  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      handleFileDrop(file);
-      e.currentTarget.value = '';
-    }
-  }, [handleFileDrop]);
+  
 
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
     setIsObjectInteracting(false);
@@ -313,17 +354,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   }, [svgObjects, selectedObjectId, onObjectSelect]);
 
 
-  const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }, []);
-  const onDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }, []);
-  const onDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      handleFileDrop(e.dataTransfer.files[0]);
-      e.dataTransfer.clearData();
-    }
-  }, [handleFileDrop]);
+  
   
   const handleReset = () => {
     onResetCanvas();
@@ -356,7 +387,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   if (!transformState) return <div className="canvas-container" />;
 
   return (
-    <div ref={containerRef} className="canvas-container" onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+    <div ref={containerRef} className="canvas-container">
       <FloatingMenu 
         menuState={menuState}
         onMenuChange={handleMenuChange}
@@ -400,7 +431,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
               <div
                 id="canvas-area"
                 onMouseDown={handleDeselect}
-                className={`canvas-area ${!hasContent ? 'empty' : ''} ${isDragging ? 'dragging' : ''}`}
+                className={`canvas-area ${!hasContent ? 'empty' : ''}`}
                 style={canvasDimensions ? { width: `${canvasDimensions.width}px`, height: `${canvasDimensions.height}px`, backgroundImage: backgroundImageUrl ? `url(${backgroundImageUrl})` : 'none' } : { width: '100%', height: '100%' }}
               >
                 {svgObjects.filter(obj => !obj.attachmentInfo).map(obj => (
@@ -466,10 +497,43 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
             </TransformComponent>
           </>
       </TransformWrapper>
-      {isDragging && (
-        <div className="drop-overlay" aria-hidden="true">
-          <UploadCloudIcon />
-          <p>Drop your PNG or SVG file</p>
+      {error && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="error-toast"
+          style={{
+            position: 'fixed',
+            left: '50%',
+            bottom: 24,
+            transform: 'translateX(-50%)',
+            background: 'rgba(220, 53, 69, 0.95)',
+            color: '#fff',
+            padding: '8px 12px',
+            borderRadius: 6,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            zIndex: 1000,
+          }}
+        >
+          <span>{error}</span>
+          <button
+            onClick={() => setError(null)}
+            aria-label="Close error"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fff',
+              fontSize: 16,
+              cursor: 'pointer',
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
     </div>

@@ -6,6 +6,7 @@ import { UserIcon, ShapesIcon, ImageIcon } from './icons';
 interface AssetPanelProps {
   onAddObject: (svgContent: string, category: AssetCategory) => void;
   onSetBackground: (imageUrl: string) => void;
+  canAddObjects?: () => boolean; // Optional guard from parent
 }
 
 const categoryIcons: Record<AssetCategory, React.ElementType> = {
@@ -19,10 +20,11 @@ const categoryNames: Record<AssetCategory, string> = {
   objets: 'Objets',
 };
 
-export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackground }) => {
+export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackground, canAddObjects }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<AssetCategory>('pantins');
+  const canAdd = canAddObjects ? canAddObjects() : true;
 
   useEffect(() => {
     const fetchAssets = async () => {
@@ -31,7 +33,7 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
         const base = import.meta.env.BASE_URL || '/';
         const manifestResponse = await fetch(`${base}assets-manifest.json`);
         if (!manifestResponse.ok) {
-          throw new Error('Failed to fetch asset manifest');
+          throw new Error('Échec du chargement du manifeste des assets');
         }
         const manifestAssets: Omit<Asset, 'content'>[] = await manifestResponse.json();
 
@@ -43,7 +45,7 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
               try {
                 const response = await fetch(resolvedPath);
                 if (!response.ok) {
-                  console.error(`Failed to fetch ${resolvedPath}`);
+                  console.error(`Échec du chargement de ${resolvedPath}`);
                   return { ...asset, content: undefined };
                 }
                 const content = await response.text();
@@ -71,6 +73,7 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
   const visibleAssets = assets.filter(
     (asset) => asset.category === activeTab
   );
+  const isBlockedTab = (activeTab === 'pantins' || activeTab === 'objets') && !canAdd;
 
   return (
     <div className="asset-panel-container">
@@ -92,38 +95,49 @@ export const AssetPanel: React.FC<AssetPanelProps> = ({ onAddObject, onSetBackgr
       </div>
 
       <div className="asset-grid-container">
+        {isBlockedTab && (
+          <div className="asset-info" role="note" style={{ padding: '8px 12px', color: '#555', fontSize: 12 }}>
+            Ajoutez un décor d'abord pour pouvoir ajouter des pantins/objets.
+          </div>
+        )}
         {isLoading ? (
           <div className="asset-placeholder">
-            <p>Loading Assets...</p>
+            <p>Chargement des assets...</p>
           </div>
         ) : (
           <div className="asset-grid">
             {visibleAssets.length > 0 ? (
-                visibleAssets.map((asset) => (
-                  <button
-                    key={asset.name}
-                    onClick={() => {
-                        if (asset.category === 'decors') {
-                            onSetBackground(asset.path);
-                        } else if (asset.content) {
-                            onAddObject(asset.content, asset.category);
-                        }
-                    }}
-                    className="asset-item"
-                    title={`Add ${asset.name}`}
-                  >
-                    <div className="asset-item-thumbnail">
-                        {asset.path.endsWith('.svg') ? (
-                             <img src={asset.path} alt={asset.name} />
-                        ) : (
-                             <img src={asset.path} alt={asset.name} />
-                        )}
-                    </div>
-                  </button>
-                ))
+                visibleAssets.map((asset) => {
+                  const isDecor = asset.category === 'decors';
+                  const isBlocked = !isDecor && !canAdd;
+                  return (
+                    <button
+                      key={asset.name}
+                      onClick={() => {
+                          if (isDecor) {
+                              onSetBackground(asset.path);
+                          } else if (!isBlocked && asset.content) {
+                              onAddObject(asset.content, asset.category);
+                          }
+                      }}
+                    className={`asset-item ${isBlocked ? 'disabled' : ''}`}
+                    title={isBlocked ? 'Définissez un décor avant d\'ajouter des pantins/objets' : `Ajouter ${asset.name}`}
+                      disabled={isBlocked}
+                      style={isBlocked ? { cursor: 'not-allowed', opacity: 0.5 } : undefined}
+                    >
+                      <div className="asset-item-thumbnail">
+                          {asset.path.endsWith('.svg') ? (
+                               <img src={asset.path} alt={asset.name} />
+                          ) : (
+                               <img src={asset.path} alt={asset.name} />
+                          )}
+                      </div>
+                    </button>
+                  );
+                })
             ) : (
                 <div className="asset-placeholder">
-                    <p>No assets in this category.</p>
+                    <p>Aucun asset dans cette catégorie.</p>
                 </div>
             )}
           </div>

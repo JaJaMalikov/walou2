@@ -28,7 +28,7 @@ const loadUILayout = (): UiLayout => {
       }
     }
   } catch (error) {
-    console.error("Failed to load UI layout from localStorage", error);
+    console.error("Échec du chargement de la disposition UI depuis localStorage", error);
   }
   return {
     leftPanelWidth: 200,
@@ -42,6 +42,7 @@ const App: React.FC = () => {
   const [initialLayout] = useState(loadUILayout);
   const canvasRef = useRef<CanvasRef>(null);
   const isInitialMount = useRef(true);
+  const saveObjectsTimerRef = useRef<number | null>(null);
 
   const [svgObjects, setSvgObjects] = useState<SvgObject[]>([]);
   const [selectedObject, setSelectedObject] = useState<SvgObject | null>(null);
@@ -55,7 +56,7 @@ const App: React.FC = () => {
         setSvgObjects(savedState.svgObjects || []);
       }
     } catch (err) {
-      console.error("Failed to load canvas state from localStorage", err);
+      console.error("Échec du chargement de l'état du canvas depuis localStorage", err);
     }
   }, []);
 
@@ -64,15 +65,28 @@ const App: React.FC = () => {
         isInitialMount.current = false;
         return;
     }
-    try {
-      const stateToSave = {
-        svgObjects,
-      };
-      localStorage.setItem('canvasState', JSON.stringify(stateToSave));
-    } catch (err) {
-      console.error("Failed to save canvas state to localStorage", err);
+    if (saveObjectsTimerRef.current) {
+      window.clearTimeout(saveObjectsTimerRef.current);
     }
+    saveObjectsTimerRef.current = window.setTimeout(() => {
+      try {
+        const stateToSave = {
+          svgObjects,
+        };
+        localStorage.setItem('canvasState', JSON.stringify(stateToSave));
+      } catch (err) {
+        console.error("Échec de l'enregistrement de l'état du canvas dans localStorage", err);
+      }
+    }, 300);
   }, [svgObjects]);
+
+  useEffect(() => {
+    return () => {
+      if (saveObjectsTimerRef.current) {
+        window.clearTimeout(saveObjectsTimerRef.current);
+      }
+    };
+  }, []);
 
 
   const handleObjectContextMenu = (e: React.MouseEvent, objectId: string) => {
@@ -132,7 +146,7 @@ const App: React.FC = () => {
         localStorage.setItem(UI_LAYOUT_STORAGE_KEY, JSON.stringify(layout));
         canvasRef.current?.fitView();
       } catch (error) {
-        console.error("Failed to save UI layout to localStorage", error);
+        console.error("Échec de l'enregistrement de la disposition UI dans localStorage", error);
       }
     }, 500);
 
@@ -239,7 +253,11 @@ const App: React.FC = () => {
     <div className="app-container">
       <main className="main-content">
         <SidePanel side="left" isOpen={leftPanelOpen} width={leftPanelWidth}>
-          <AssetPanel onAddObject={handleAddObject} onSetBackground={handleSetBackground} />
+          <AssetPanel 
+            onAddObject={handleAddObject} 
+            onSetBackground={handleSetBackground} 
+            canAddObjects={() => !!canvasRef.current?.hasBackground()} 
+          />
         </SidePanel>
 
         <ResizeHandle isVisible={leftPanelOpen} {...leftResizeHandleProps} />

@@ -8,12 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@types/react':
-        specifier: ^19.2.0
-        version: 19.2.0
-      '@types/react-dom':
-        specifier: ^19.2.0
-        version: 19.2.0(@types/react@19.2.0)
       react:
         specifier: ^19.2.0
         version: 19.2.0
@@ -30,6 +24,12 @@ importers:
       '@types/node':
         specifier: ^24.6.2
         version: 24.6.2
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.2.0
+      '@types/react-dom':
+        specifier: ^19.2.0
+        version: 19.2.0(@types/react@19.2.0)
       '@vitejs/plugin-react':
         specifier: ^5.0.0
         version: 5.0.4(vite@7.1.8(@types/node@24.6.2))
