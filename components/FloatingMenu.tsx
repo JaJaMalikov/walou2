@@ -12,6 +12,7 @@ import {
   PointerIcon,
   RotateCwIcon
 } from './icons';
+import { LightbulbIcon, SlidersIcon } from './icons';
 
 interface MenuState {
   x: number;
@@ -37,6 +38,8 @@ interface FloatingMenuProps {
   zoomPercent?: number;
   interactionMode: 'select' | 'rotate';
   onChangeInteractionMode: (mode: 'select' | 'rotate') => void;
+  onAddSpotlight?: () => void;
+  onToggleEffects?: () => void;
 }
 
 export const FloatingMenu: React.FC<FloatingMenuProps> = ({ 
@@ -44,7 +47,9 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
   leftPanelOpen, rightPanelOpen, dockOpen,
   onToggleLeftPanel, onToggleRightPanel, onToggleDock,
   onFitView, onZoomIn, onZoomOut, zoomPercent,
-  interactionMode, onChangeInteractionMode
+  interactionMode, onChangeInteractionMode,
+  onAddSpotlight,
+  onToggleEffects
 }) => {
   return (
     <Rnd
@@ -60,7 +65,8 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
       }}
       minWidth={380}
       minHeight={52}
-      bounds="parent"
+      bounds="window"
+      style={{ position: 'fixed', zIndex: 210 }}
       dragHandleClassName="drag-handle"
       className="floating-menu-rnd"
     >
@@ -69,6 +75,27 @@ export const FloatingMenu: React.FC<FloatingMenuProps> = ({
           <MoveIcon />
         </button>
         <div className="menu-divider"></div>
+            {onAddSpotlight && (
+              <button
+                title="Ajouter un spot lumineux"
+                aria-label="Ajouter un spot lumineux"
+                onClick={onAddSpotlight}
+                className="menu-button"
+              >
+                <LightbulbIcon />
+              </button>
+            )}
+            {onToggleEffects && (
+              <button
+                title="Ouvrir le panneau des spots"
+                aria-label="Ouvrir le panneau des spots"
+                onClick={onToggleEffects}
+                className="menu-button"
+              >
+                <SlidersIcon />
+              </button>
+            )}
+            {onAddSpotlight && <div className="menu-divider"></div>}
         <div className="menu-buttons">
             <button
                 title="Select/Move Mode"

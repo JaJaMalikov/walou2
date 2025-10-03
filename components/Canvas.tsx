@@ -3,9 +3,10 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Rnd } from 'react-rnd';
 import { TrashIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
+import { EffectsPanel } from './EffectsPanel';
 import type { CanvasRef, SvgObject, AssetCategory } from '../types';
 import { Pantin } from './Pantin';
-import { processSvg, getSvgDimensions } from './utils';
+import { processSvg, getSvgDimensions, generateSpotlightSvg } from './utils';
 
 interface MenuState {
   x: number;
@@ -23,6 +24,8 @@ interface CanvasLocalState {
     positionY: number;
   };
   menuState?: MenuState;
+  effectsOpen?: boolean;
+  effectsPanelState?: MenuState;
 }
 
 interface CanvasProps {
@@ -56,6 +59,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   const [canvasDimensions, setCanvasDimensions] = useState<{width: number, height: number} | null>(null);
   const [transformState, setTransformState] = useState<CanvasLocalState['transformState'] | null>(null);
   const [menuState, setMenuState] = useState<MenuState>({ x: 50, y: 80, width: 420, height: 52 });
+  const [effectsOpen, setEffectsOpen] = useState<boolean>(false);
+  const [effectsPanelState, setEffectsPanelState] = useState<{x:number;y:number;width:number|string;height:number|string}>({ x: 60, y: 150, width: 360, height: 280 });
   const [error, setError] = useState<string | null>(null);
   const [isObjectInteracting, setIsObjectInteracting] = useState(false);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
@@ -79,6 +84,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         setCanvasDimensions(savedState.canvasDimensions || null);
         setTransformState(savedState.transformState || { scale: 1, positionX: 0, positionY: 0 });
         setMenuState(savedState.menuState || { x: 50, y: 80, width: 420, height: 52 });
+        if (typeof savedState.effectsOpen === 'boolean') setEffectsOpen(savedState.effectsOpen);
+        if (savedState.effectsPanelState) setEffectsPanelState(savedState.effectsPanelState as any);
       } else {
         setTransformState({ scale: 1, positionX: 0, positionY: 0 });
       }
@@ -101,13 +108,15 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
           canvasDimensions,
           transformState,
           menuState,
+          effectsOpen,
+          effectsPanelState: effectsPanelState as any,
         };
         localStorage.setItem('canvasLocalState', JSON.stringify(stateToSave));
       } catch (err) {
       console.error("Échec de l'enregistrement de l'état du canvas dans localStorage", err);
       }
     }, 300);
-  }, [backgroundImageUrl, canvasDimensions, transformState, menuState]);
+  }, [backgroundImageUrl, canvasDimensions, transformState, menuState, effectsOpen, effectsPanelState]);
 
   useEffect(() => {
     return () => {
@@ -192,6 +201,38 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     };
     onAddObject(newSvg);
   }, [transformState, onAddObject, backgroundImageUrl, canvasDimensions, svgObjects]);
+
+  const addSpotlight = useCallback(() => {
+    if (!backgroundImageUrl || !canvasDimensions) {
+      setError(prev => prev ?? 'Définissez un décor avant d’ajouter des spots.');
+      return;
+    }
+    const viewportEl = containerRef.current;
+    if (!viewportEl || !transformState) return;
+    const viewRect = viewportEl.getBoundingClientRect();
+    const centerX = (viewRect.width / 2 - transformState.positionX) / transformState.scale;
+    const centerY = (viewRect.height / 2 - transformState.positionY) / transformState.scale;
+
+    const w = Math.round((canvasDimensions.width || 1000) * 0.25);
+    const h = Math.round((canvasDimensions.height || 800) * 0.2);
+    const spotlight = { color: '#ffffff', intensity: 80, softness: 60, shape: 'ellipse' as const, coneAngle: 45, offsetX: 0, offsetY: 0, range: 100 };
+    const svg = generateSpotlightSvg(w, h, spotlight);
+
+    const newObj: SvgObject = {
+      id: `spot-${Date.now()}`,
+      name: 'Spot',
+      content: processSvg(svg),
+      x: Math.round(centerX - w / 2),
+      y: Math.round(centerY - h / 2),
+      width: w,
+      height: h,
+      category: 'objets',
+      rotation: 0,
+      zIndex: Math.max(0, ...svgObjects.map(o => o.zIndex ?? 0)) + 5,
+      spotlight,
+    };
+    onAddObject(newObj);
+  }, [backgroundImageUrl, canvasDimensions, containerRef, transformState, onAddObject, svgObjects]);
 
   const setBackground = useCallback((imageUrl: string) => {
     setError(null);
@@ -337,6 +378,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     calculateAndSetAttachment: calculateAndSetAttachment,
     calculateAndDetachObject: calculateAndDetachObject,
     hasBackground: () => !!backgroundImageUrl,
+    addSpotlight: addSpotlight,
   }));
 
   
@@ -444,6 +486,11 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
     const onWheel = (e: WheelEvent) => {
       if (isObjectInteracting) return; // Don't interfere during object manipulation
+      // Ignore wheel when interacting with floating overlays (panels/menus)
+      const targetEl = e.target as Element | null;
+      if (targetEl && (targetEl.closest('.effects-panel') || targetEl.closest('.floating-menu-rnd') || targetEl.closest('.context-menu'))) {
+        return; // let the overlay scroll naturally
+      }
       // Only act within the canvas; prevent page scroll
       if (e.cancelable) e.preventDefault();
       e.stopPropagation();
@@ -489,6 +536,18 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         zoomPercent={Math.round(transformState.scale * 100)}
         interactionMode={interactionMode}
         onChangeInteractionMode={setInteractionMode}
+        onAddSpotlight={addSpotlight}
+        onToggleEffects={() => setEffectsOpen(v => !v)}
+      />
+      <EffectsPanel
+        open={effectsOpen}
+        panelState={effectsPanelState}
+        onPanelChange={u => setEffectsPanelState(p => ({ ...p, ...u }))}
+        svgObjects={svgObjects}
+        onUpdateObject={onUpdateObject}
+        onDeleteObject={onDeleteObject}
+        onAddSpotlight={addSpotlight}
+        onClose={() => setEffectsOpen(false)}
       />
       <TransformWrapper
         ref={transformWrapperRef}

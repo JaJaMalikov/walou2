@@ -93,3 +93,11 @@ export const EyeIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
     <circle cx="12" cy="12" r="3"/>
   </svg>
 );
+
+export const LightbulbIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M9 18h6"/>
+    <path d="M10 22h4"/>
+    <path d="M2 11a10 10 0 0 1 20 0c0 3.866-2.239 6.377-4 8-0.5.46-1 1-1 2H7c0-1-.5-1.54-1-2-1.761-1.623-4-4.134-4-8z"/>
+  </svg>
+);

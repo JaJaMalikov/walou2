@@ -2,6 +2,8 @@ import React, { useMemo, useEffect, useState } from 'react';
 import type { SvgObject } from '../types';
 import { ARTICULABLE_PARTS } from '../types';
 import { ChevronsRightLeftIcon, SlidersIcon, RotateCwIcon, EyeIcon } from './icons';
+import { generateSpotlightSvg } from './utils';
+import { processSvg } from './utils';
 import { getSvgDimensions } from './utils';
 
 interface InspectorPanelProps {
@@ -218,6 +220,16 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
     if (!ARTICULABLE_PARTS.includes(selectedPart)) setSelectedPart(ARTICULABLE_PARTS[0] || '');
   }, [selectedPart]);
 
+  // Helper to update spotlight safely
+  const applySpot = (patch: Partial<NonNullable<SvgObject['spotlight']>>) => {
+    if (!selectedObject || !selectedObject.spotlight) return;
+    const prev = selectedObject.spotlight;
+    const next = { ...prev, ...patch } as NonNullable<SvgObject['spotlight']>;
+    try { if (JSON.stringify(prev) === JSON.stringify(next)) return; } catch {}
+    const svg = generateSpotlightSvg(selectedObject.width, selectedObject.height, next as any);
+    onUpdateObject(selectedObject.id, { spotlight: next, content: processSvg(svg) });
+  };
+
   // Tabs
   const [activeTab, setActiveTab] = useState<TabKey>('general');
   useEffect(() => {
@@ -292,15 +304,15 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
       <div className="space-y-4">
         {activeTab === 'general' && (
         <div className="inspector-section">
-          <label className="inspector-label" htmlFor="obj-name">Nom</label>
-          <input
-            id="obj-name"
-            type="text"
-            className="inspector-input"
-            value={selectedObject.name ?? ''}
-            onChange={handleNameChange}
-            placeholder={selectedObject.id}
-          />
+            <label className="inspector-label" htmlFor="obj-name">Nom</label>
+            <input
+              id="obj-name"
+              type="text"
+              className="inspector-input"
+              value={selectedObject.name ?? ''}
+              onChange={handleNameChange}
+              placeholder={selectedObject.id}
+            />
         </div>
         )}
 
@@ -396,6 +408,119 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
              )}
           </div>
         </div>
+        )}
+
+        {activeTab === 'general' && selectedObject.spotlight && (
+          <div className="inspector-section">
+            <label className="inspector-label">Spot</label>
+            <div className="inspector-group">
+              <div className="inspector-row one-col">
+                <div className="inspector-input-wrapper">
+                  <label style={{ width: 'auto', marginRight: 8 }}>Forme</label>
+                  <select
+                    className="inspector-input"
+                    style={{ textAlign: 'left' }}
+                    value={selectedObject.spotlight.shape || 'ellipse'}
+                    onChange={(e) => applySpot({ shape: e.target.value as any })}
+                  >
+                    <option value="ellipse">Ellipse</option>
+                    <option value="cone">Cône</option>
+                  </select>
+                </div>
+              </div>
+              {(selectedObject.spotlight.shape || 'ellipse') === 'cone' && (
+                <div className="inspector-row one-col">
+                  <PropertyInput
+                    label="Ouverture (°)"
+                    name="spot-cone-angle"
+                    value={selectedObject.spotlight.coneAngle ?? 45}
+                    onChange={(e) => applySpot({ coneAngle: Math.max(5, Math.min(170, parseInt(e.target.value,10) || 45)) })}
+                    onValueChange={(v) => applySpot({ coneAngle: Math.max(5, Math.min(170, v)) })}
+                    min={5}
+                    max={170}
+                    step={1}
+                    layout="stacked"
+                  />
+                </div>
+              )}
+
+              {/* Offsets */}
+              <div className="inspector-row">
+                <PropertyInput
+                  label="Décal. X"
+                  name="spot-offx"
+                  value={selectedObject.spotlight.offsetX ?? 0}
+                  onChange={(e) => applySpot({ offsetX: Math.max(-100, Math.min(100, parseInt(e.target.value,10) || 0)) })}
+                  onValueChange={(v) => applySpot({ offsetX: Math.max(-100, Math.min(100, v)) })}
+                  min={-100}
+                  max={100}
+                  step={1}
+                />
+                <PropertyInput
+                  label="Décal. Y"
+                  name="spot-offy"
+                  value={selectedObject.spotlight.offsetY ?? 0}
+                  onChange={(e) => applySpot({ offsetY: Math.max(-100, Math.min(100, parseInt(e.target.value,10) || 0)) })}
+                  onValueChange={(v) => applySpot({ offsetY: Math.max(-100, Math.min(100, v)) })}
+                  min={-100}
+                  max={100}
+                  step={1}
+                />
+              </div>
+              <div className="inspector-row one-col">
+                <div className="inspector-input-wrapper stacked">
+                  <label htmlFor="spot-color">Couleur</label>
+                  <input
+                    id="spot-color"
+                    type="color"
+                    className="inspector-input"
+                    style={{ padding: 0, height: 32 }}
+                    value={selectedObject.spotlight.color}
+                    onChange={(e) => applySpot({ color: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="inspector-row one-col">
+                <PropertyInput
+                  label="Intensité (%)"
+                  name="spot-intensity"
+                  value={selectedObject.spotlight.intensity}
+                  onChange={(e) => applySpot({ intensity: Math.max(0, Math.min(100, parseInt(e.target.value,10) || 0)) })}
+                  onValueChange={(v) => applySpot({ intensity: Math.max(0, Math.min(100, v)) })}
+                  min={0}
+                  max={100}
+                  step={1}
+                  layout="stacked"
+                />
+              </div>
+              <div className="inspector-row one-col">
+                <PropertyInput
+                  label="Douceur (%)"
+                  name="spot-softness"
+                  value={selectedObject.spotlight.softness}
+                  onChange={(e) => applySpot({ softness: Math.max(0, Math.min(100, parseInt(e.target.value,10) || 0)) })}
+                  onValueChange={(v) => applySpot({ softness: Math.max(0, Math.min(100, v)) })}
+                  min={0}
+                  max={100}
+                  step={1}
+                  layout="stacked"
+                />
+              </div>
+              <div className="inspector-row one-col">
+                <PropertyInput
+                  label="Portée (%)"
+                  name="spot-range"
+                  value={selectedObject.spotlight.range ?? 100}
+                  onChange={(e) => applySpot({ range: Math.max(10, Math.min(300, parseInt(e.target.value,10) || 100)) })}
+                  onValueChange={(v) => applySpot({ range: Math.max(10, Math.min(300, v)) })}
+                  min={10}
+                  max={300}
+                  step={1}
+                  layout="stacked"
+                />
+              </div>
+            </div>
+          </div>
         )}
         
         {selectedObject.category === 'pantins' && activeTab === 'articulation' && (

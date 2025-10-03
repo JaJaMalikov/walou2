@@ -198,6 +198,9 @@ const App: React.FC = () => {
   const handleSetBackground = (imageUrl: string) => {
     canvasRef.current?.setBackground(imageUrl);
   };
+  const handleAddSpotlight = () => {
+    canvasRef.current?.addSpotlight();
+  };
   
   const handleUpdateObject = (id: string, newProps: Partial<SvgObject>) => {
     setSvgObjects(prevObjects =>

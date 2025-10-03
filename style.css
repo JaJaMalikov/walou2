@@ -229,6 +229,8 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 /* 6. Floating Menu    */
 /* ------------------- */
 .floating-menu-rnd { z-index: 20; }
+.effects-panel { width: 360px; height: 280px; }
+.effects-panel .floating-menu-content { height: 100%; display: flex; flex-direction: column; }
 .floating-menu-content {
   background-color: rgba(55, 65, 81, 0.6);
   backdrop-filter: blur(10px);

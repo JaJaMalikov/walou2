@@ -25,6 +25,16 @@ export interface SvgObject {
   articulation?: { [key: string]: number }; // e.g. { tete: -15, bras_gauche: 20 }
   flipped?: boolean;
   rotation?: number; // degrees, for generic objects
+  spotlight?: {
+    shape?: 'ellipse' | 'cone';
+    coneAngle?: number; // degrees for cone opening
+    color: string; // hex color
+    intensity: number; // 0-100
+    softness: number; // 0-100
+    offsetX?: number; // -100..100 (% of width)
+    offsetY?: number; // -100..100 (% of height)
+    range?: number; // 10..200 (%) portée
+  };
   attachmentInfo?: {
     parentId: string;
     limbId: string;
@@ -47,4 +57,5 @@ export type CanvasRef = {
   calculateAndSetAttachment: (childId: string, parentId: string, limbId: string) => void;
   calculateAndDetachObject: (childId: string) => void;
   hasBackground: () => boolean;
+  addSpotlight: () => void;
 };
