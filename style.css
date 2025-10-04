@@ -126,7 +126,7 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 .dock-content {
   height: 100%;
   overflow: auto;
-  padding: 1rem;
+  padding: 5px;
 }
 
 .dock-header {
@@ -140,6 +140,51 @@ button:focus-visible, input:focus-visible, a:focus-visible {
 .dock-header svg { width: 1.25rem; height: 1.25rem; }
 .dock-header h2 { font-size: 1rem; font-weight: 600; }
 .dock-text { color: var(--color-text-secondary); font-size: 0.875rem; }
+
+/* ------------------- */
+/* 9. Timeline UI      */
+/* ------------------- */
+.timeline-shell {
+  display: flex; flex-direction: column; height: 100%; gap: 8px;
+}
+.timeline-toolbar {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  border: 1px solid var(--color-border-light);
+  background-color: rgba(31, 41, 55, 0.6);
+  border-radius: 6px;
+}
+.timeline-toolbar .spacer { flex: 1; }
+.timeline-toolbar-field { display: flex; align-items: center; gap: 6px; }
+.timeline-toolbar-field input[type="number"] { width: 72px; }
+.timeline-toolbar-check label { display: flex; align-items: center; gap: 6px; color: var(--color-text-secondary); }
+.timeline-toolbar button {
+  padding: 6px 10px; border-radius: 6px; background-color: rgba(55,65,81,0.6);
+  border: 1px solid var(--color-border-light); color: var(--color-text-primary);
+}
+.timeline-toolbar button:hover { background-color: rgba(75,85,99,0.8); }
+
+.timeline-keyframe-adder { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--color-text-secondary); }
+.timeline-keyframe-adder button { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--color-border-light); background-color: rgba(55,65,81,0.6); color: var(--color-text-primary); }
+.timeline-keyframe-adder button:hover { background-color: rgba(75,85,99,0.8); }
+
+.timeline-body { display: grid; grid-template-rows: auto 1fr; min-height: 0; border: 1px solid var(--color-border-light); border-radius: 6px; overflow: hidden; }
+.timeline-header-row, .timeline-track-row { display: grid; grid-template-columns: 240px 1fr; }
+.timeline-col-label { padding: 6px 8px; background-color: rgba(31, 41, 55, 0.7); border-right: 1px solid var(--color-border-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timeline-col-lanes { position: relative; overflow: auto; background: linear-gradient(transparent, transparent); }
+
+.timeline-ruler { position: relative; height: 26px; border-bottom: 1px solid var(--color-border-light); }
+.timeline-ruler .tick { position: absolute; top: 0; height: 100%; width: 1px; background-color: var(--color-border-light); }
+.timeline-ruler .tick span { position: absolute; top: 6px; left: 4px; font-size: 11px; color: var(--color-text-tertiary); transform: translateX(-50%); }
+
+.timeline-rows { overflow: auto; max-height: 100%; }
+.lane { position: relative; height: 28px; }
+.lane::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(to right, rgba(55,65,81,0.3) 1px, transparent 1px); background-size: 60px 100%; opacity: 0.4; pointer-events: none; }
+.kf { position: absolute; top: 50%; width: 10px; height: 10px; transform: translate(-50%, -50%) rotate(45deg); background-color: var(--color-accent); border: 1px solid white; box-shadow: 0 0 0 2px rgba(59,130,246,0.4); border-radius: 2px; cursor: pointer; }
+.kf:hover { box-shadow: 0 0 0 3px rgba(59,130,246,0.6); }
+.playhead { position: absolute; top: 0; bottom: 0; width: 2px; background-color: var(--color-danger); pointer-events: none; }
+
+.timeline-track-row { border-bottom: 1px solid var(--color-border-light); }
+.timeline-empty { padding: 12px; color: var(--color-text-tertiary); }
 
 /* ------------------- */
 /* 4. Resize Handle    */

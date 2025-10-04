@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
 import type { SvgObject } from '../types';
 import { ARTICULABLE_PARTS } from '../types';
+import { useEditorStore } from '../stores/editorStore';
+import { useTimelineStore } from '../stores/timelineStore';
 
 interface ContextMenuProps {
   x: number;
   y: number;
   targetId: string | null;
-  svgObjects: SvgObject[];
   onAttach: (childId: string, parentId: string, limbId: string) => void;
   onDetach: (childId: string) => void;
   onClose: () => void;
-  onUpdateObject: (id: string, newProps: Partial<SvgObject>) => void;
-  onDelete: (id: string) => void;
 }
 
-export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetId, svgObjects, onAttach, onDetach, onClose, onUpdateObject, onDelete }) => {
+export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetId, onAttach, onDetach, onClose }) => {
   const [showAttachSubMenu, setShowAttachSubMenu] = useState(false);
+  const svgObjects = useEditorStore(s => s.svgObjects);
+  const updateObject = useEditorStore(s => s.updateObject);
+  const deleteObject = useEditorStore(s => s.deleteObject);
+  const captureFromUpdate = useTimelineStore(s => s.captureFromUpdate);
 
   const targetObject = svgObjects.find(obj => obj.id === targetId);
   const puppets = svgObjects.filter(obj => obj.category === 'pantins' && obj.id !== targetId);
@@ -43,7 +46,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetId, svgObj
 
   const adjustZ = (delta: number) => {
     if (!targetObject) return;
-    onUpdateObject(targetObject.id, { zIndex: (targetObject.zIndex ?? 0) + delta });
+    updateObject(targetObject.id, { zIndex: (targetObject.zIndex ?? 0) + delta });
     onClose();
   };
 
@@ -51,7 +54,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetId, svgObj
     if (!targetObject) return;
     const others = svgObjects.filter(o => !o.attachmentInfo && o.id !== targetObject.id && !o.hidden);
     const maxZ = others.reduce((m, o) => Math.max(m, o.zIndex ?? 0), 0);
-    onUpdateObject(targetObject.id, { zIndex: maxZ + 10 });
+    updateObject(targetObject.id, { zIndex: maxZ + 10 });
     onClose();
   };
 
@@ -59,19 +62,21 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetId, svgObj
     if (!targetObject) return;
     const others = svgObjects.filter(o => !o.attachmentInfo && o.id !== targetObject.id && !o.hidden);
     const minZ = others.reduce((m, o) => Math.min(m, o.zIndex ?? 0), 0);
-    onUpdateObject(targetObject.id, { zIndex: minZ - 10 });
+    updateObject(targetObject.id, { zIndex: minZ - 10 });
     onClose();
   };
 
   const toggleLocked = () => {
     if (!targetObject) return;
-    onUpdateObject(targetObject.id, { locked: !isLocked });
+    updateObject(targetObject.id, { locked: !isLocked });
     onClose();
   };
 
   const toggleHidden = () => {
     if (!targetObject) return;
-    onUpdateObject(targetObject.id, { hidden: !isHidden });
+    const patch = { hidden: !isHidden } as Partial<SvgObject>;
+    captureFromUpdate(targetObject, patch);
+    updateObject(targetObject.id, patch);
     onClose();
   };
 
@@ -79,7 +84,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetId, svgObj
     if (!targetObject) return;
     const label = targetObject.name ?? targetObject.id;
     if (window.confirm(`Supprimer définitivement « ${label} » ?`)) {
-      onDelete(targetObject.id);
+      deleteObject(targetObject.id);
       onClose();
     }
   };
