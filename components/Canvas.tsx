@@ -4,7 +4,7 @@ import { Rnd } from 'react-rnd';
 import { TrashIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
 import { EffectsPanel } from './EffectsPanel';
-import type { CanvasRef, SvgObject, AssetCategory } from '../types';
+import type { CanvasRef, SvgObject, AssetCategory, SvgOverrides } from '../types';
 import { Pantin } from './Pantin';
 import { processSvg, getSvgDimensions, generateSpotlightSvg } from './utils';
 
@@ -30,9 +30,11 @@ interface CanvasLocalState {
 
 interface CanvasProps {
   svgObjects: SvgObject[];
+  overrides?: SvgOverrides;
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
   dockOpen: boolean;
+  disableInteractions?: boolean;
   onToggleLeftPanel: () => void;
   onToggleRightPanel: () => void;
   onToggleDock: () => void;
@@ -46,7 +48,9 @@ interface CanvasProps {
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(({ 
   svgObjects,
+  overrides,
   leftPanelOpen, rightPanelOpen, dockOpen,
+  disableInteractions,
   onToggleLeftPanel, onToggleRightPanel, onToggleDock, 
   onObjectSelect,
   onObjectContextMenu,
@@ -581,14 +585,18 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                 {svgObjects
                   .filter(obj => !obj.attachmentInfo && !obj.hidden)
                   .sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0))
-                  .map(obj => (
+                  .map(obj0 => {
+                    const ov = overrides?.[obj0.id] || {};
+                    const obj: SvgObject = { ...obj0, ...ov, articulation: { ...(obj0.articulation || {}), ...(ov.articulation || {}) } };
+                    if (obj.hidden) return null;
+                    return (
                   <Rnd
                     key={obj.id}
                     scale={transformState.scale}
                     size={{ width: obj.width, height: obj.height }}
                     position={{ x: obj.x, y: obj.y }}
-                    disableDragging={interactionMode === 'rotate' || !!obj.locked}
-                    enableResizing={interactionMode !== 'rotate' && !obj.locked}
+                    disableDragging={interactionMode === 'rotate' || !!obj.locked || !!disableInteractions}
+                    enableResizing={interactionMode !== 'rotate' && !obj.locked && !disableInteractions}
                     style={{ zIndex: obj.zIndex ?? 0 }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
@@ -640,7 +648,7 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                       )}
                     </div>
                   </Rnd>
-                ))}
+                );})}
               </div>
             </TransformComponent>
           </>

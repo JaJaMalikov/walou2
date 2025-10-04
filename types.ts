@@ -59,3 +59,55 @@ export type CanvasRef = {
   hasBackground: () => boolean;
   addSpotlight: () => void;
 };
+
+// Timeline types
+export type TimelineInterpolation = 'linear' | 'step';
+
+export type TimelineProperty = 'position' | 'rotation' | 'visibility' | 'articulation';
+
+export interface TimelineKeyframe<T> {
+  frame: number;
+  value: T;
+  interpolation?: TimelineInterpolation;
+}
+
+export interface TimelineTrackBase {
+  id: string; // unique track id
+  objectId: string; // target object id
+  property: TimelineProperty;
+}
+
+export interface PositionTrack extends TimelineTrackBase {
+  property: 'position';
+  keyframes: TimelineKeyframe<{ x: number; y: number }>[];
+}
+
+export interface RotationTrack extends TimelineTrackBase {
+  property: 'rotation';
+  keyframes: TimelineKeyframe<number>[];
+}
+
+export interface VisibilityTrack extends TimelineTrackBase {
+  property: 'visibility';
+  keyframes: TimelineKeyframe<boolean>[];
+}
+
+export interface ArticulationTrack extends TimelineTrackBase {
+  property: 'articulation';
+  part: string; // articulable part id
+  keyframes: TimelineKeyframe<number>[]; // angle in degrees
+}
+
+export type TimelineTrack = PositionTrack | RotationTrack | VisibilityTrack | ArticulationTrack;
+
+export interface TimelineState {
+  fps: number; // frames per second
+  duration: number; // total frames
+  currentFrame: number;
+  isPlaying: boolean;
+  loop: boolean;
+  tracks: TimelineTrack[];
+  autoKeyframe?: boolean;
+}
+
+export type SvgOverrides = Record<string, Partial<SvgObject>>;
