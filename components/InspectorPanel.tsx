@@ -5,11 +5,10 @@ import { ChevronsRightLeftIcon, SlidersIcon, RotateCwIcon, EyeIcon } from './ico
 import { generateSpotlightSvg } from './utils';
 import { processSvg } from './utils';
 import { getSvgDimensions } from './utils';
+import { useEditorStore } from '../stores/editorStore';
+import { useTimelineStore } from '../stores/timelineStore';
 
 interface InspectorPanelProps {
-  selectedObject: SvgObject | null;
-  svgObjects: SvgObject[];
-  onUpdateObject: (id: string, newProps: Partial<SvgObject>) => void;
   onDetachObject: (childId: string) => void;
   compact?: boolean;
 }
@@ -103,7 +102,11 @@ const ArticulationInput: React.FC<{ partName: string; value: number; onChange: (
 
 type TabKey = 'general' | 'articulation' | 'affichage';
 
-export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, svgObjects, onUpdateObject, onDetachObject, compact = false }) => {
+export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onDetachObject, compact = false }) => {
+  const svgObjects = useEditorStore(s => s.svgObjects);
+  const selectedObject = useEditorStore(s => s.svgObjects.find(o => o.id === s.selectedObjectId) || null);
+  const updateObject = useEditorStore(s => s.updateObject);
+  const captureFromUpdate = useTimelineStore(s => s.captureFromUpdate);
   
   const attachedChildren = selectedObject ? svgObjects.filter(obj => obj.attachmentInfo?.parentId === selectedObject.id) : [];
   const isAttached = !!selectedObject?.attachmentInfo;
@@ -125,25 +128,27 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
       if (numericValue > 180) numericValue = 180;
       if (numericValue < -180) numericValue = -180;
     }
-    onUpdateObject(selectedObject.id, { [name]: numericValue });
+    const patch: Partial<SvgObject> = { [name]: numericValue } as any;
+    captureFromUpdate(selectedObject, patch);
+    updateObject(selectedObject.id, patch);
   };
 
   const handleArticulationChange = (partName: string, angle: number) => {
     if (!selectedObject) return;
     const current = selectedObject.articulation || {};
-    onUpdateObject(selectedObject.id, {
-        articulation: { ...current, [partName]: angle }
-    });
+    const patch = { articulation: { ...current, [partName]: angle } } as Partial<SvgObject>;
+    captureFromUpdate(selectedObject, patch);
+    updateObject(selectedObject.id, patch);
   };
 
   const handleFlip = () => {
     if (!selectedObject) return;
-    onUpdateObject(selectedObject.id, { flipped: !selectedObject.flipped });
+    updateObject(selectedObject.id, { flipped: !selectedObject.flipped });
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedObject) return;
-    onUpdateObject(selectedObject.id, { name: e.target.value });
+    updateObject(selectedObject.id, { name: e.target.value });
   };
 
   const handleScaleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,12 +159,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
     const ratio = percent / 100;
     const newWidth = Math.max(1, Math.round(baseDims.width * ratio));
     const newHeight = Math.max(1, Math.round(baseDims.height * ratio));
-    onUpdateObject(selectedObject.id, { width: newWidth, height: newHeight });
+    updateObject(selectedObject.id, { width: newWidth, height: newHeight });
   };
 
   const resetAllArticulation = () => {
     if (!selectedObject) return;
-    onUpdateObject(selectedObject.id, { articulation: {} });
+    const patch = { articulation: {} } as Partial<SvgObject>;
+    captureFromUpdate(selectedObject, patch);
+    updateObject(selectedObject.id, patch);
   };
 
   const mirrorArticulation = () => {
@@ -182,7 +189,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
       next[left] = -rightVal;
       next[right] = -leftVal;
     });
-    onUpdateObject(selectedObject.id, { articulation: next });
+    const patch = { articulation: next } as Partial<SvgObject>;
+    captureFromUpdate(selectedObject, patch);
+    updateObject(selectedObject.id, patch);
   };
 
   const copyLeftToRight = () => {
@@ -196,7 +205,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
       const leftVal = current[left] ?? 0;
       next[right] = -leftVal;
     });
-    onUpdateObject(selectedObject.id, { articulation: next });
+    const patch = { articulation: next } as Partial<SvgObject>;
+    captureFromUpdate(selectedObject, patch);
+    updateObject(selectedObject.id, patch);
   };
 
   const copyRightToLeft = () => {
@@ -210,7 +221,9 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
       const rightVal = current[right] ?? 0;
       next[left] = -rightVal;
     });
-    onUpdateObject(selectedObject.id, { articulation: next });
+    const patch = { articulation: next } as Partial<SvgObject>;
+    captureFromUpdate(selectedObject, patch);
+    updateObject(selectedObject.id, patch);
   };
 
   // Articulation listview state
@@ -227,7 +240,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
     const next = { ...prev, ...patch } as NonNullable<SvgObject['spotlight']>;
     try { if (JSON.stringify(prev) === JSON.stringify(next)) return; } catch {}
     const svg = generateSpotlightSvg(selectedObject.width, selectedObject.height, next as any);
-    onUpdateObject(selectedObject.id, { spotlight: next, content: processSvg(svg) });
+    updateObject(selectedObject.id, { spotlight: next, content: processSvg(svg) });
   };
 
   // Tabs
@@ -248,7 +261,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
         next[left] = 0;
       }
     });
-    onUpdateObject(selectedObject.id, { articulation: next });
+    { const p = { articulation: next } as Partial<SvgObject>; captureFromUpdate(selectedObject, p); updateObject(selectedObject.id, p); }
   };
 
   const zeroRight = () => {
@@ -260,7 +273,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
         next[right] = 0;
       }
     });
-    onUpdateObject(selectedObject.id, { articulation: next });
+    { const p = { articulation: next } as Partial<SvgObject>; captureFromUpdate(selectedObject, p); updateObject(selectedObject.id, p); }
   };
   
   if (!selectedObject) {
@@ -348,7 +361,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                      name="x"
                      value={selectedObject.x}
                      onChange={handleChange}
-                     onValueChange={(v) => onUpdateObject(selectedObject.id, { x: v })}
+                     onValueChange={(v) => { const p = { x: v } as Partial<SvgObject>; captureFromUpdate(selectedObject, p); updateObject(selectedObject.id, p); }}
                       disabled={isAttached}
                       layout={compact ? 'stacked' : 'inline'}
                    />
@@ -357,7 +370,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                       name="y"
                       value={selectedObject.y}
                       onChange={handleChange}
-                      onValueChange={(v) => onUpdateObject(selectedObject.id, { y: v })}
+                      onValueChange={(v) => { const p = { y: v } as Partial<SvgObject>; captureFromUpdate(selectedObject, p); updateObject(selectedObject.id, p); }}
                       disabled={isAttached}
                       layout={compact ? 'stacked' : 'inline'}
                     />
@@ -374,7 +387,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                        const ratio = (isNaN(percent) ? 100 : percent) / 100;
                        const newWidth = Math.max(1, Math.round(baseDims.width * ratio));
                        const newHeight = Math.max(1, Math.round(baseDims.height * ratio));
-                       onUpdateObject(selectedObject.id, { width: newWidth, height: newHeight });
+                       updateObject(selectedObject.id, { width: newWidth, height: newHeight });
                      }}
                      min={1}
                      max={1000}
@@ -394,7 +407,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                          let n = v;
                          if (n > 180) n = 180;
                          if (n < -180) n = -180;
-                         onUpdateObject(selectedObject.id, { rotation: n });
+                         const p = { rotation: n } as Partial<SvgObject>; captureFromUpdate(selectedObject, p); updateObject(selectedObject.id, p);
                        }}
                        min={-180}
                        max={180}
@@ -624,7 +637,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                     <input
                       type="checkbox"
                       checked={!!selectedObject.locked}
-                      onChange={(e) => onUpdateObject(selectedObject.id, { locked: e.target.checked })}
+                      onChange={(e) => updateObject(selectedObject.id, { locked: e.target.checked })}
                     />
                     Verrouiller déplacement/redimensionnement
                   </label>
@@ -634,7 +647,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                     <input
                       type="checkbox"
                       checked={!!selectedObject.hidden}
-                      onChange={(e) => onUpdateObject(selectedObject.id, { hidden: e.target.checked })}
+                      onChange={(e) => { const p = { hidden: e.target.checked } as Partial<SvgObject>; captureFromUpdate(selectedObject, p); updateObject(selectedObject.id, p); }}
                     />
                     Masquer l'objet
                   </label>
@@ -649,14 +662,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                   <div className="inspector-row" style={{ gap: 8 }}>
                     <button
                       className="menu-button"
-                      onClick={() => onUpdateObject(selectedObject.id, { zIndex: (selectedObject.zIndex ?? 0) - 1 })}
+                      onClick={() => updateObject(selectedObject.id, { zIndex: (selectedObject.zIndex ?? 0) - 1 })}
                       title="Descendre d'un plan"
                     >
                       Descendre
                     </button>
                     <button
                       className="menu-button"
-                      onClick={() => onUpdateObject(selectedObject.id, { zIndex: (selectedObject.zIndex ?? 0) + 1 })}
+                      onClick={() => updateObject(selectedObject.id, { zIndex: (selectedObject.zIndex ?? 0) + 1 })}
                       title="Monter d'un plan"
                     >
                       Monter
@@ -666,7 +679,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                       onClick={() => {
                         const others = svgObjects.filter(o => !o.attachmentInfo && o.id !== selectedObject.id && !o.hidden);
                         const maxZ = others.reduce((m, o) => Math.max(m, o.zIndex ?? 0), 0);
-                        onUpdateObject(selectedObject.id, { zIndex: maxZ + 10 });
+                        updateObject(selectedObject.id, { zIndex: maxZ + 10 });
                       }}
                       title="Envoyer tout devant"
                     >
@@ -677,7 +690,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ selectedObject, 
                       onClick={() => {
                         const others = svgObjects.filter(o => !o.attachmentInfo && o.id !== selectedObject.id && !o.hidden);
                         const minZ = others.reduce((m, o) => Math.min(m, o.zIndex ?? 0), 0);
-                        onUpdateObject(selectedObject.id, { zIndex: minZ - 10 });
+                        updateObject(selectedObject.id, { zIndex: minZ - 10 });
                       }}
                       title="Envoyer tout derrière"
                     >

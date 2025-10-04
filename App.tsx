@@ -7,10 +7,11 @@ import { useResizable } from './components/icons/useResizable';
 import { AssetPanel } from './components/AssetPanel';
 import { InspectorPanel } from './components/InspectorPanel';
 import { ContextMenu } from './components/ContextMenu';
-import type { CanvasRef, SvgObject, AssetCategory, TimelineState, SvgOverrides } from './types';
-import { addKeyframesFromUpdate, clampFrame, findAdjacentKeyframe } from './components/timelineUtils';
-import { RowsIcon } from './components/icons';
-import { Timeline, makeEmptyTimeline } from './components/Timeline';
+import type { CanvasRef, SvgObject, AssetCategory } from './types';
+import { findAdjacentKeyframe } from './components/timelineUtils';
+import { Timeline } from './components/Timeline';
+import { useTimelineStore } from './stores/timelineStore';
+import { useEditorStore } from './stores/editorStore';
 
 const UI_LAYOUT_STORAGE_KEY = 'uiLayoutState';
 
@@ -43,74 +44,10 @@ const loadUILayout = (): UiLayout => {
 const App: React.FC = () => {
   const [initialLayout] = useState(loadUILayout);
   const canvasRef = useRef<CanvasRef>(null);
-  const isInitialMount = useRef(true);
-  const saveObjectsTimerRef = useRef<number | null>(null);
-
-  const [svgObjects, setSvgObjects] = useState<SvgObject[]>([]);
-  const [selectedObject, setSelectedObject] = useState<SvgObject | null>(null);
+  const svgObjects = useEditorStore(s => s.svgObjects);
   const [contextMenuState, setContextMenuState] = useState<{ x: number, y: number, targetId: string | null }>({ x: 0, y: 0, targetId: null });
-  const [timeline, setTimeline] = useState<TimelineState>(makeEmptyTimeline());
-  const [timelineOverrides, setTimelineOverrides] = useState<SvgOverrides>({});
 
-  useEffect(() => {
-    try {
-      const savedStateJSON = localStorage.getItem('canvasState');
-      if (savedStateJSON) {
-        const savedState = JSON.parse(savedStateJSON);
-        setSvgObjects(savedState.svgObjects || []);
-      }
-      const savedTimeline = localStorage.getItem('timelineState');
-      if (savedTimeline) {
-        const parsed = JSON.parse(savedTimeline);
-        if (parsed && parsed.tracks) {
-          setTimeline({ ...makeEmptyTimeline(), ...parsed, isPlaying: false });
-        }
-      }
-    } catch (err) {
-      console.error("Échec du chargement de l'état du canvas depuis localStorage", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (isInitialMount.current) {
-        isInitialMount.current = false;
-        return;
-    }
-    if (saveObjectsTimerRef.current) {
-      window.clearTimeout(saveObjectsTimerRef.current);
-    }
-    saveObjectsTimerRef.current = window.setTimeout(() => {
-      try {
-        const stateToSave = {
-          svgObjects,
-        };
-        localStorage.setItem('canvasState', JSON.stringify(stateToSave));
-      } catch (err) {
-        console.error("Échec de l'enregistrement de l'état du canvas dans localStorage", err);
-      }
-    }, 300);
-  }, [svgObjects]);
-
-  // Persist timeline (except volatile play state)
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        const { isPlaying, ...rest } = timeline;
-        localStorage.setItem('timelineState', JSON.stringify(rest));
-      } catch (e) {
-        console.error("Échec de l'enregistrement de la timeline", e);
-      }
-    }, 300);
-    return () => clearTimeout(t);
-  }, [timeline]);
-
-  useEffect(() => {
-    return () => {
-      if (saveObjectsTimerRef.current) {
-        window.clearTimeout(saveObjectsTimerRef.current);
-      }
-    };
-  }, []);
+  // State persistence handled by zustand stores (editor + timeline)
 
 
   const handleObjectContextMenu = (e: React.MouseEvent, objectId: string) => {
@@ -211,9 +148,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const onAddObject = (newObject: SvgObject) => {
-    setSvgObjects(prev => [...prev, newObject]);
-  };
+  // Object add/update/delete handled via stores or Canvas ref
 
   const handleAddObject = (svgContent: string, category: AssetCategory) => {
     canvasRef.current?.spawnAndAddObject(svgContent, category);
@@ -226,41 +161,11 @@ const App: React.FC = () => {
     canvasRef.current?.addSpotlight();
   };
   
-  const handleUpdateObject = (id: string, newProps: Partial<SvgObject>) => {
-    // Auto-keyframe capture before state mutation
-    if (timeline.autoKeyframe && !timeline.isPlaying) {
-      const prevObj = svgObjects.find(o => o.id === id);
-      if (prevObj) {
-        setTimeline(t => addKeyframesFromUpdate(t, prevObj, newProps));
-      }
-    }
-
-    setSvgObjects(prevObjects => prevObjects.map(obj => (obj.id === id ? { ...obj, ...newProps } : obj)));
-    
-    const currentObject = selectedObject?.id === id ? selectedObject : null;
-    if (currentObject) {
-        let finalProps = newProps;
-        if (newProps.articulation && currentObject.articulation) {
-            finalProps = {
-                ...newProps,
-                articulation: {
-                    ...currentObject.articulation,
-                    ...newProps.articulation,
-                },
-            };
-        }
-        setSelectedObject(prev => (prev && prev.id === id) ? { ...prev, ...finalProps } : prev);
-    }
-  };
-
-  const handleDeleteObject = (id: string) => {
-    setSvgObjects(prev => prev.filter(obj => obj.id !== id));
-  };
+  // Legacy object handlers removed (stores are used directly)
 
   const handleResetCanvas = () => {
-    setSvgObjects([]);
-    setTimeline(makeEmptyTimeline());
-    setTimelineOverrides({});
+    useTimelineStore.getState().clear();
+    useEditorStore.getState().reset();
   };
 
   const scheduleFitView = () => {
@@ -289,27 +194,28 @@ const App: React.FC = () => {
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.key === ' ') {
         e.preventDefault();
-        setTimeline(t => ({ ...t, isPlaying: !t.isPlaying }));
+        const t = useTimelineStore.getState();
+        if (t.isPlaying) t.pause(); else t.play();
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
-        setTimeline(t => ({ ...t, currentFrame: clampFrame(t.currentFrame + step, 0, t.duration) }));
+        const t = useTimelineStore.getState();
+        t.scrubTo(t.currentFrame + step);
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
         const step = e.shiftKey ? 10 : 1;
-        setTimeline(t => ({ ...t, currentFrame: clampFrame(t.currentFrame - step, 0, t.duration) }));
+        const t = useTimelineStore.getState();
+        t.scrubTo(t.currentFrame - step);
       } else if (e.ctrlKey && e.key.toLowerCase() === 'arrowright') {
         e.preventDefault();
-        setTimeline(t => {
-          const f = findAdjacentKeyframe(t.tracks, t.currentFrame, 'next');
-          return f == null ? t : { ...t, currentFrame: f };
-        });
+        const t = useTimelineStore.getState();
+        const f = findAdjacentKeyframe(t.tracks, t.currentFrame, 'next');
+        if (f != null) t.scrubTo(f);
       } else if (e.ctrlKey && e.key.toLowerCase() === 'arrowleft') {
         e.preventDefault();
-        setTimeline(t => {
-          const f = findAdjacentKeyframe(t.tracks, t.currentFrame, 'prev');
-          return f == null ? t : { ...t, currentFrame: f };
-        });
+        const t = useTimelineStore.getState();
+        const f = findAdjacentKeyframe(t.tracks, t.currentFrame, 'prev');
+        if (f != null) t.scrubTo(f);
       }
     };
     window.addEventListener('keydown', onKey, { capture: true });
@@ -332,34 +238,20 @@ const App: React.FC = () => {
         <div className="canvas-wrapper">
           <Canvas 
             ref={canvasRef}
-            svgObjects={svgObjects}
-            overrides={timelineOverrides}
-            disableInteractions={timeline.isPlaying}
             leftPanelOpen={leftPanelOpen}
             rightPanelOpen={rightPanelOpen}
             dockOpen={dockOpen}
             onToggleLeftPanel={handleToggleLeftPanel}
             onToggleRightPanel={handleToggleRightPanel}
             onToggleDock={handleToggleDock}
-            onObjectSelect={setSelectedObject}
             onObjectContextMenu={handleObjectContextMenu}
-            onAddObject={onAddObject}
-            onUpdateObject={handleUpdateObject}
-            onDeleteObject={handleDeleteObject}
-            onResetCanvas={handleResetCanvas}
           />
         </div>
 
         <ResizeHandle isVisible={rightPanelOpen} {...rightResizeHandleProps} />
         
         <SidePanel side="right" isOpen={rightPanelOpen} width={rightPanelWidth}>
-           <InspectorPanel 
-            selectedObject={selectedObject} 
-            svgObjects={svgObjects}
-            onUpdateObject={handleUpdateObject} 
-            onDetachObject={handleDetachObject}
-            compact={rightPanelWidth <= 220}
-          />
+           <InspectorPanel onDetachObject={handleDetachObject} compact={rightPanelWidth <= 220} />
         </SidePanel>
       </main>
 
@@ -369,13 +261,7 @@ const App: React.FC = () => {
         <div className="dock-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
           <div style={{ flex: 1, minHeight: 0 }}>
-            <Timeline
-              svgObjects={svgObjects}
-              selectedObject={selectedObject}
-              value={timeline}
-              onChange={setTimeline}
-              onComputedOverrides={setTimelineOverrides}
-            />
+            <Timeline />
           </div>
         </div>
       </Dock>
@@ -387,12 +273,9 @@ const App: React.FC = () => {
             x={contextMenuState.x}
             y={contextMenuState.y}
             targetId={contextMenuState.targetId}
-            svgObjects={svgObjects}
             onAttach={handleAttachObject}
             onDetach={handleDetachObject}
             onClose={handleCloseContextMenu}
-            onUpdateObject={handleUpdateObject}
-            onDelete={handleDeleteObject}
           />
         </>
       )}

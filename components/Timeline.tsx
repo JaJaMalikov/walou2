@@ -1,15 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SvgObject, TimelineState, TimelineTrack, TimelineProperty, SvgOverrides } from '../types';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { TimelineState, TimelineTrack, TimelineProperty } from '../types';
 import { ARTICULABLE_PARTS } from '../types';
-import { clampFrame, computeOverrides } from './timelineUtils';
-
-type TimelineProps = {
-  svgObjects: SvgObject[];
-  selectedObject: SvgObject | null;
-  value: TimelineState;
-  onChange: (next: TimelineState) => void;
-  onComputedOverrides: (overrides: SvgOverrides) => void;
-};
+import { useTimelineStore } from '../stores/timelineStore';
+import { useEditorStore } from '../stores/editorStore';
 
 const DEFAULT_FPS = 24;
 const DEFAULT_DURATION = 240; // 10s by default
@@ -30,57 +23,79 @@ function uid(prefix = 'trk'): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-export const Timeline: React.FC<TimelineProps> = ({ svgObjects, selectedObject, value, onChange, onComputedOverrides }) => {
-  const { fps, duration, currentFrame, isPlaying, loop, tracks } = value;
+export const Timeline: React.FC = () => {
+  const {
+    fps,
+    duration,
+    currentFrame,
+    isPlaying,
+    loop,
+    tracks,
+    setPartial,
+    play: playAction,
+    pause: pauseAction,
+    stop: stopAction,
+    clear: clearAction,
+    scrubTo,
+    setTracks,
+    deleteKeyframe,
+    autoKeyframe,
+  } = useTimelineStore(s => ({
+    fps: s.fps,
+    duration: s.duration,
+    currentFrame: s.currentFrame,
+    isPlaying: s.isPlaying,
+    loop: s.loop,
+    tracks: s.tracks,
+    setPartial: s.setPartial,
+    play: s.play,
+    pause: s.pause,
+    stop: s.stop,
+    clear: s.clear,
+    scrubTo: s.scrubTo,
+    setTracks: s.setTracks,
+    deleteKeyframe: s.deleteKeyframe,
+    autoKeyframe: s.autoKeyframe,
+  }));
+  const svgObjects = useEditorStore(s => s.svgObjects);
+  const selectedObject = useEditorStore(s => s.svgObjects.find(o => o.id === s.selectedObjectId) || null);
   const [zoom, setZoom] = useState<number>(1); // horizontal zoom factor
   const pxPerFrame = 6 * zoom; // base scale
   const contentWidth = Math.max(600, Math.ceil((duration + 1) * pxPerFrame));
   const rafRef = useRef<number | null>(null);
   const lastTickRef = useRef<number>(0);
 
-  const effectiveOverrides = useMemo(() => computeOverrides({ currentFrame, tracks }), [currentFrame, tracks]);
-  useEffect(() => { onComputedOverrides(effectiveOverrides); }, [effectiveOverrides, onComputedOverrides]);
-
-  const setPartial = (patch: Partial<TimelineState>) => onChange({ ...value, ...patch });
-
-  const play = () => {
-    if (isPlaying) return;
-    setPartial({ isPlaying: true });
-  };
-  const pause = () => setPartial({ isPlaying: false });
-  const stop = () => setPartial({ isPlaying: false, currentFrame: 0 });
+  const play = () => { if (!isPlaying) playAction(); };
+  const pause = () => pauseAction();
+  const stop = () => stopAction();
 
   const clearTimeline = () => {
     const yes = window.confirm('Purger la timeline ?\nToutes les pistes et keyframes seront supprimées.');
     if (!yes) return;
-    onChange({
-      ...value,
-      isPlaying: false,
-      currentFrame: 0,
-      tracks: [],
-    });
+    clearAction();
   };
 
   const tick = useCallback((now: number) => {
-    if (!value.isPlaying) return;
+    if (!useTimelineStore.getState().isPlaying) return;
     if (!lastTickRef.current) lastTickRef.current = now;
+    const { fps: _fps, currentFrame: cf, duration: dur, loop: _loop } = useTimelineStore.getState();
     const deltaMs = now - lastTickRef.current;
-    const framesToAdvance = Math.floor(deltaMs / (1000 / fps));
+    const framesToAdvance = Math.floor(deltaMs / (1000 / _fps));
     if (framesToAdvance > 0) {
       lastTickRef.current = now;
-      const next = currentFrame + framesToAdvance;
-      if (next >= duration) {
-        if (loop) {
-          onChange({ ...value, currentFrame: next % duration, isPlaying: true });
+      const next = cf + framesToAdvance;
+      if (next >= dur) {
+        if (_loop) {
+          useTimelineStore.getState().setPartial({ currentFrame: next % dur, isPlaying: true });
         } else {
-          onChange({ ...value, currentFrame: duration, isPlaying: false });
+          useTimelineStore.getState().setPartial({ currentFrame: dur, isPlaying: false });
         }
       } else {
-        onChange({ ...value, currentFrame: next });
+        useTimelineStore.getState().setPartial({ currentFrame: next });
       }
     }
     rafRef.current = requestAnimationFrame(tick);
-  }, [value, onChange, fps, currentFrame, duration, loop]);
+  }, []);
 
   useEffect(() => {
     if (isPlaying) {
@@ -142,15 +157,10 @@ export const Timeline: React.FC<TimelineProps> = ({ svgObjects, selectedObject, 
       t.keyframes.sort((a: any, b: any) => a.frame - b.frame);
     }
 
-    onChange({ ...value, tracks: nextTracks });
+    setTracks(nextTracks);
   };
 
-  const deleteKeyframe = (trackId: string, frame: number) => {
-    const nextTracks = value.tracks.map(t => (t.id === trackId ? { ...t, keyframes: (t as any).keyframes.filter((k: any) => k.frame !== frame) } : t));
-    onChange({ ...value, tracks: nextTracks });
-  };
-
-  const scrubTo = (f: number) => setPartial({ currentFrame: clampFrame(Math.round(f), 0, duration) });
+  const scrubToLocal = (f: number) => scrubTo(f);
 
   const [kfProp, setKfProp] = useState<TimelineProperty>('position');
   const [kfPart, setKfPart] = useState<string>(ARTICULABLE_PARTS[0]);
@@ -159,7 +169,7 @@ export const Timeline: React.FC<TimelineProps> = ({ svgObjects, selectedObject, 
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const f = Math.round(x / pxPerFrame);
-    scrubTo(f);
+    scrubToLocal(f);
   };
 
   return (
@@ -171,7 +181,7 @@ export const Timeline: React.FC<TimelineProps> = ({ svgObjects, selectedObject, 
         <div className="spacer" />
         <div className="timeline-toolbar-field">
           <span>Frame</span>
-          <input type="number" value={currentFrame} min={0} max={duration} onChange={e => scrubTo(Number(e.target.value))} />
+          <input type="number" value={currentFrame} min={0} max={duration} onChange={e => scrubToLocal(Number(e.target.value))} />
         </div>
         <div className="timeline-toolbar-field">
           <span>FPS</span>
@@ -185,11 +195,11 @@ export const Timeline: React.FC<TimelineProps> = ({ svgObjects, selectedObject, 
           <label><input type="checkbox" checked={loop} onChange={e => setPartial({ loop: e.target.checked })} /> Loop</label>
         </div>
         <div className="timeline-toolbar-check">
-          <label><input type="checkbox" checked={!!value.autoKeyframe} onChange={e => setPartial({ autoKeyframe: e.target.checked })} /> Auto‑KF</label>
+          <label><input type="checkbox" checked={!!autoKeyframe} onChange={e => setPartial({ autoKeyframe: e.target.checked })} /> Auto‑KF</label>
         </div>
         <div className="timeline-toolbar-field">
           <span>Zoom</span>
-          <input type="range" min={0.5} max={4} step={0.25} value={zoom} onChange={e => setZoom(Number(e.target.value))} />
+ <input type="range" min={0.5} max={4} step={0.25} value={zoom} onChange={e => setZoom(Number(e.target.value))} />
         </div>
       </div>
 
@@ -243,7 +253,7 @@ export const Timeline: React.FC<TimelineProps> = ({ svgObjects, selectedObject, 
                 <div className="timeline-col-lanes">
                   <div className="lane" style={{ width: contentWidth }} onClick={laneClick}>
                     {keyframes.map(kf => (
-                      <div key={kf.frame} className="kf" style={{ left: kf.frame * pxPerFrame }} title={`f=${kf.frame}`} onClick={(e) => { e.stopPropagation(); scrubTo(kf.frame); }} onDoubleClick={(e) => { e.stopPropagation(); deleteKeyframe(track.id, kf.frame); }} />
+                      <div key={kf.frame} className="kf" style={{ left: kf.frame * pxPerFrame }} title={`f=${kf.frame}`} onClick={(e) => { e.stopPropagation(); scrubToLocal(kf.frame); }} onDoubleClick={(e) => { e.stopPropagation(); deleteKeyframe(track.id, kf.frame); }} />
                     ))}
                     <div className="playhead" style={{ left: currentFrame * pxPerFrame }} />
                   </div>

@@ -4,9 +4,11 @@ import { Rnd } from 'react-rnd';
 import { TrashIcon } from './icons';
 import { FloatingMenu } from './FloatingMenu';
 import { EffectsPanel } from './EffectsPanel';
-import type { CanvasRef, SvgObject, AssetCategory, SvgOverrides } from '../types';
+import type { CanvasRef, SvgObject, AssetCategory } from '../types';
 import { Pantin } from './Pantin';
 import { processSvg, getSvgDimensions, generateSpotlightSvg } from './utils';
+import { useEditorStore } from '../stores/editorStore';
+import { useTimelineStore, selectOverrides } from '../stores/timelineStore';
 
 interface MenuState {
   x: number;
@@ -29,36 +31,28 @@ interface CanvasLocalState {
 }
 
 interface CanvasProps {
-  svgObjects: SvgObject[];
-  overrides?: SvgOverrides;
   leftPanelOpen: boolean;
   rightPanelOpen: boolean;
   dockOpen: boolean;
-  disableInteractions?: boolean;
   onToggleLeftPanel: () => void;
   onToggleRightPanel: () => void;
   onToggleDock: () => void;
-  onObjectSelect: (object: SvgObject | null) => void;
   onObjectContextMenu: (e: React.MouseEvent, objectId: string) => void;
-  onAddObject: (newObject: SvgObject) => void;
-  onUpdateObject: (id: string, newProps: Partial<SvgObject>) => void;
-  onDeleteObject: (id: string) => void;
-  onResetCanvas: () => void;
 }
 
 export const Canvas = forwardRef<CanvasRef, CanvasProps>(({ 
-  svgObjects,
-  overrides,
   leftPanelOpen, rightPanelOpen, dockOpen,
-  disableInteractions,
   onToggleLeftPanel, onToggleRightPanel, onToggleDock, 
-  onObjectSelect,
   onObjectContextMenu,
-  onAddObject,
-  onUpdateObject,
-  onDeleteObject,
-  onResetCanvas
 }, ref) => {
+  const svgObjects = useEditorStore(s => s.svgObjects);
+  const addObject = useEditorStore(s => s.addObject);
+  const updateObject = useEditorStore(s => s.updateObject);
+  const deleteObject = useEditorStore(s => s.deleteObject);
+  const selectObject = useEditorStore(s => s.selectObject);
+  const overrides = useTimelineStore(selectOverrides);
+  const isPlaying = useTimelineStore(s => s.isPlaying);
+  const captureFromUpdate = useTimelineStore(s => s.captureFromUpdate);
   const [backgroundImageUrl, setBackgroundImageUrl] = useState<string | null>(null);
   const [canvasDimensions, setCanvasDimensions] = useState<{width: number, height: number} | null>(null);
   const [transformState, setTransformState] = useState<CanvasLocalState['transformState'] | null>(null);
@@ -138,10 +132,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
   const deleteSelectedObject = useCallback(() => {
     if (!selectedObjectId) return;
-    onDeleteObject(selectedObjectId);
+    deleteObject(selectedObjectId);
     setSelectedObjectId(null);
-    onObjectSelect(null);
-  }, [selectedObjectId, onObjectSelect, onDeleteObject]);
+    selectObject(null);
+  }, [selectedObjectId, deleteObject, selectObject]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -203,8 +197,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       zIndex: maxZ + 1,
       flipped: false,
     };
-    onAddObject(newSvg);
-  }, [transformState, onAddObject, backgroundImageUrl, canvasDimensions, svgObjects]);
+    addObject(newSvg);
+  }, [transformState, addObject, backgroundImageUrl, canvasDimensions, svgObjects]);
 
   const addSpotlight = useCallback(() => {
     if (!backgroundImageUrl || !canvasDimensions) {
@@ -235,8 +229,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
       zIndex: Math.max(0, ...svgObjects.map(o => o.zIndex ?? 0)) + 5,
       spotlight,
     };
-    onAddObject(newObj);
-  }, [backgroundImageUrl, canvasDimensions, containerRef, transformState, onAddObject, svgObjects]);
+    addObject(newObj);
+  }, [backgroundImageUrl, canvasDimensions, containerRef, transformState, addObject, svgObjects]);
 
   const setBackground = useCallback((imageUrl: string) => {
     setError(null);
@@ -319,11 +313,14 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
     const { a, b, c, d, e, f } = relativeMatrix;
     const transformString = `matrix(${a}, ${b}, ${c}, ${d}, ${e}, ${f})`;
 
-    onUpdateObject(childId, { 
-        attachmentInfo: { parentId, limbId, transform: transformString },
-        x: 0, // Reset position as it's now relative
-        y: 0,
-    });
+    const prev = svgObjects.find(o => o.id === childId);
+    const patch = { 
+      attachmentInfo: { parentId, limbId, transform: transformString },
+      x: 0,
+      y: 0,
+    } as Partial<SvgObject>;
+    if (prev) captureFromUpdate(prev, patch);
+    updateObject(childId, patch);
   };
 
   const calculateAndDetachObject = (childId: string) => {
@@ -367,12 +364,15 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         newRotation = Math.round(angleDeg);
     }
 
-    onUpdateObject(childId, {
-        attachmentInfo: undefined,
-        x: newX,
-        y: newY,
-        rotation: newRotation,
-    });
+    const prev = svgObjects.find(o => o.id === childId);
+    const patch: Partial<SvgObject> = {
+      attachmentInfo: undefined,
+      x: newX,
+      y: newY,
+      rotation: newRotation,
+    };
+    if (prev) captureFromUpdate(prev, patch);
+    updateObject(childId, patch);
   };
 
   useImperativeHandle(ref, () => ({
@@ -391,28 +391,32 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
 
   const handleDragStop = (id: string, d: { x: number; y: number }) => {
     setIsObjectInteracting(false);
-    onUpdateObject(id, { x: d.x, y: d.y });
+    const prev = svgObjects.find(o => o.id === id);
+    const patch = { x: d.x, y: d.y } as Partial<SvgObject>;
+    if (prev) captureFromUpdate(prev, patch);
+    updateObject(id, patch);
   };
   
   useEffect(() => {
     if (selectedObjectId) {
-        const selected = svgObjects.find(obj => obj.id === selectedObjectId);
-        onObjectSelect(selected || null);
+      selectObject(selectedObjectId);
     } else {
-        onObjectSelect(null);
+      selectObject(null);
     }
-  }, [svgObjects, selectedObjectId, onObjectSelect]);
+  }, [selectedObjectId, selectObject]);
 
 
   
   
   const handleReset = () => {
-    onResetCanvas();
+    // Clear both stores
+    useEditorStore.getState().reset();
+    useTimelineStore.getState().clear();
     setBackgroundImageUrl(null);
     setCanvasDimensions(null);
     setError(null);
     setSelectedObjectId(null);
-    onObjectSelect(null);
+    selectObject(null);
     if (transformWrapperRef.current) {
         transformWrapperRef.current.resetTransform();
     }
@@ -424,12 +428,12 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
   
   const handleSelectObject = (obj: SvgObject) => {
     setSelectedObjectId(obj.id);
-    onObjectSelect(obj);
+    selectObject(obj.id);
   };
   
   const handleDeselect = () => {
     setSelectedObjectId(null);
-    onObjectSelect(null);
+    selectObject(null);
   }
 
   const hasContent = svgObjects.length > 0 || backgroundImageUrl;
@@ -548,8 +552,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
         panelState={effectsPanelState}
         onPanelChange={u => setEffectsPanelState(p => ({ ...p, ...u }))}
         svgObjects={svgObjects}
-        onUpdateObject={onUpdateObject}
-        onDeleteObject={onDeleteObject}
+        onUpdateObject={(id, patch) => updateObject(id, patch)}
+        onDeleteObject={(id) => deleteObject(id)}
         onAddSpotlight={addSpotlight}
         onClose={() => setEffectsOpen(false)}
       />
@@ -595,8 +599,8 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     scale={transformState.scale}
                     size={{ width: obj.width, height: obj.height }}
                     position={{ x: obj.x, y: obj.y }}
-                    disableDragging={interactionMode === 'rotate' || !!obj.locked || !!disableInteractions}
-                    enableResizing={interactionMode !== 'rotate' && !obj.locked && !disableInteractions}
+                    disableDragging={interactionMode === 'rotate' || !!obj.locked || !!isPlaying}
+                    enableResizing={interactionMode !== 'rotate' && !obj.locked && !isPlaying}
                     style={{ zIndex: obj.zIndex ?? 0 }}
                     onMouseDown={(e) => {
                       e.stopPropagation();
@@ -606,13 +610,16 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                     onDragStart={() => setIsObjectInteracting(true)}
                     onDragStop={(_, d) => handleDragStop(obj.id, d)}
                     onResizeStart={() => setIsObjectInteracting(true)}
-                    onResizeStop={(_, __, ref, ___, position) => {
+                      onResizeStop={(_, __, ref, ___, position) => {
                       setIsObjectInteracting(false);
-                      onUpdateObject(obj.id, {
+                      const patch: Partial<SvgObject> = {
                         width: parseInt(ref.style.width, 10),
                         height: parseInt(ref.style.height, 10),
                         ...position,
-                      });
+                      };
+                      const prev = svgObjects.find(o => o.id === obj.id);
+                      if (prev) captureFromUpdate(prev, patch);
+                      updateObject(obj.id, patch);
                     }}
                     bounds="parent"
                     className={`resizable-object ${selectedObjectId === obj.id ? 'selected' : ''}`}
@@ -632,9 +639,10 @@ export const Canvas = forwardRef<CanvasRef, CanvasProps>(({
                           onInteractionEnd={() => setIsObjectInteracting(false)}
                           onArticulationChange={(partName, angle) => {
                             const currentArticulation = obj.articulation || {};
-                            onUpdateObject(obj.id, { 
-                                articulation: { ...currentArticulation, [partName]: angle } 
-                            });
+                            const patch: Partial<SvgObject> = { articulation: { ...currentArticulation, [partName]: angle } };
+                            const prev = svgObjects.find(o => o.id === obj.id);
+                            if (prev) captureFromUpdate(prev, patch);
+                            updateObject(obj.id, patch);
                           }}
                           onAttachedObjectContextMenu={(e, id) => onObjectContextMenu(e as any, id)}
                           ref={el => { pantinRefs.current[obj.id] = el; }}
