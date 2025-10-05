@@ -29,7 +29,7 @@ export const Dock = ({ height, children }: DockProps) => {
     }
 
     const isVisible = height > 0;
-    const timeline = gsap.timeline({ defaults: { ease: 'power2.out' } });
+    const timeline = gsap.timeline({ defaults: { ease: 'power2.out', overwrite: 'auto' } });
 
     timeline.to(dockRef.current, { height, duration: 0.35 }, 0);
     timeline.to(contentRef.current, { opacity: isVisible ? 1 : 0, duration: 0.25 }, isVisible ? 0.1 : 0);
