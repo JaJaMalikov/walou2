@@ -258,11 +258,8 @@ const App: React.FC = () => {
       <ResizeHandle isVisible={dockOpen} orientation="horizontal" {...dockResizeHandleProps} />
       
       <Dock height={dockOpen ? dockHeight : 0}>
-        <div className="dock-content" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <Timeline />
-          </div>
+        <div className="dock-timeline-area">
+          <Timeline />
         </div>
       </Dock>
 
