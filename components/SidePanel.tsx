@@ -31,7 +31,7 @@ export const SidePanel = ({ side, isOpen, width, children }: SidePanelProps) => 
     }
 
     const targetWidth = isOpen ? width : 0;
-    const timeline = gsap.timeline({ defaults: { ease: 'power2.out' } });
+    const timeline = gsap.timeline({ defaults: { ease: 'power2.out', overwrite: 'auto' } });
 
     timeline.to(panelRef.current, { width: targetWidth, duration: 0.35 }, 0);
     timeline.to(contentRef.current, { opacity: isOpen ? 1 : 0, duration: 0.25 }, isOpen ? 0 : 0);
@@ -51,6 +51,7 @@ export const SidePanel = ({ side, isOpen, width, children }: SidePanelProps) => 
       width,
       duration: 0.18,
       ease: 'power1.out',
+      overwrite: 'auto',
     });
   }, [width, isOpen]);
 
