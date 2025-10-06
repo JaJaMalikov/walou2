@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from 'react';
 import type { SvgObject } from '../types';
-import { ARTICULABLE_PARTS } from '../types';
 
 interface PantinProps {
   object: SvgObject;
@@ -19,16 +18,45 @@ interface SvgNode {
     children: SvgNode[];
 }
 
+// Extract pivot from a `data-pivot="x, y"` attribute, either on the element
+// itself or on one of its descendants. No legacy fallback.
 const findPivotCoords = (el: Element | null): string | null => {
     if (!el) return null;
+
+    // 1) Preferred: data-pivot on the element itself
+    const selfPivot = el.getAttribute('data-pivot');
+    if (selfPivot) {
+        const match = selfPivot.match(/(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)/);
+        if (match) {
+            const x = parseFloat(match[1]);
+            const y = parseFloat(match[2]);
+            if (!Number.isNaN(x) && !Number.isNaN(y)) return `${x}px ${y}px`;
+        }
+    }
+
+    // 2) data-pivot on a descendant (e.g. path inside a group)
+    const descendantWithPivot = el.querySelector('[data-pivot]') as Element | null;
+    if (descendantWithPivot) {
+        const pivotAttr = descendantWithPivot.getAttribute('data-pivot');
+        if (pivotAttr) {
+            const match = pivotAttr.match(/(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)/);
+            if (match) {
+                const x = parseFloat(match[1]);
+                const y = parseFloat(match[2]);
+                if (!Number.isNaN(x) && !Number.isNaN(y)) return `${x}px ${y}px`;
+            }
+        }
+    }
+
+    // 3) Legacy: <circle class="pivot"> immediate child
     const pivotCircle = el.querySelector(":scope > circle.pivot") as SVGCircleElement | null;
-    if (!pivotCircle) return null;
+    if (pivotCircle) {
+        const cx = parseFloat(pivotCircle.getAttribute("cx") || "");
+        const cy = parseFloat(pivotCircle.getAttribute("cy") || "");
+        if (!isNaN(cx) && !isNaN(cy)) return `${cx}px ${cy}px`;
+    }
 
-    const cx = parseFloat(pivotCircle.getAttribute("cx") || "");
-    const cy = parseFloat(pivotCircle.getAttribute("cy") || "");
-    if (isNaN(cx) || isNaN(cy)) return null;
-
-    return `${cx}px ${cy}px`;
+    return null;
 };
 
 const getSvgContentOnly = (svgString: string): string => {
@@ -48,7 +76,8 @@ const SvgPart: React.FC<{
     const style: React.CSSProperties = { ...props.style };
 
     const partId = props.id;
-    if (partId && ARTICULABLE_PARTS.includes(partId)) {
+    const isInteractive = (props['data-interactive'] === 'true');
+    if (partId && isInteractive) {
         const pivot = pivots[partId];
         if (pivot) {
             style.transformOrigin = pivot;
@@ -119,6 +148,9 @@ const PantinComponent: React.ForwardRefRenderFunction<SVGSVGElement, PantinProps
             for (const attr of Array.from(node.attributes)) {
                 if (attr.name === 'class') {
                     props.className = attr.value;
+                } else if (attr.name.startsWith('data-')) {
+                    // Preserve real data-* attributes as-is for downstream logic
+                    props[attr.name] = attr.value;
                 } else if (attr.name.includes('-')) {
                     const camelCaseName = attr.name.replace(/-([a-z])/g, g => g[1].toUpperCase());
                     props[camelCaseName] = attr.value;
@@ -132,14 +164,14 @@ const PantinComponent: React.ForwardRefRenderFunction<SVGSVGElement, PantinProps
         };
         
         const pivots: { [key: string]: string } = {};
-        ARTICULABLE_PARTS.forEach(partId => {
-            const el = svgElement.querySelector(`#${partId}`);
-            if (el) {
-                const pivot = findPivotCoords(el.parentElement);
-                if (pivot) {
-                    pivots[partId] = pivot;
-                }
-            }
+        // Only parts explicitly marked interactive, keyed by their ids
+        const interactiveNodes = svgElement.querySelectorAll('[data-interactive="true"]');
+        interactiveNodes.forEach((n) => {
+            const el = n as Element;
+            const id = el.getAttribute('id');
+            if (!id) return;
+            const pivot = findPivotCoords(el);
+            if (pivot) pivots[id] = pivot;
         });
 
         const rootNode = parseNode(svgElement);
@@ -157,10 +189,9 @@ const PantinComponent: React.ForwardRefRenderFunction<SVGSVGElement, PantinProps
             }
         };
 
-        ["poignet_droite", "poignet_gauche", "hanche_droite", "hanche_gauche"].forEach((id) => {
-            const node = svg.querySelector(`#${id}`);
-            if (node) sendToBack(node);
-        });
+        // Generic reordering: any element marked as behind its parent
+        const behindNodes = svg.querySelectorAll('[data-isbehindparent]');
+        behindNodes.forEach((node) => sendToBack(node));
     }, [parsedSvg, object.flipped]);
 
     const activePartRef = useRef<string | null>(null);
@@ -180,8 +211,8 @@ const PantinComponent: React.ForwardRefRenderFunction<SVGSVGElement, PantinProps
         let el: Element | null = target;
         const svg = svgInternalRef.current;
         while (el && el !== svg) {
-            const id = (el as Element).id;
-            if (id && ARTICULABLE_PARTS.includes(id)) return id;
+            const id = el.id;
+            if (id && (el.getAttribute('data-interactive') === 'true')) return id;
             el = el.parentElement;
         }
         return null;
@@ -202,19 +233,27 @@ const PantinComponent: React.ForwardRefRenderFunction<SVGSVGElement, PantinProps
     const findPivotForPart = (partId: string): { x: number; y: number } | null => {
         const svg = svgInternalRef.current;
         if (!svg) return null;
-        const partNode = svg.querySelector(`#${partId}`);
-        const pivotCircle = partNode?.parentElement?.querySelector('circle.pivot') as SVGCircleElement | null;
-        if (!pivotCircle) return null;
-        const cx = parseFloat(pivotCircle.getAttribute('cx') || '');
-        const cy = parseFloat(pivotCircle.getAttribute('cy') || '');
-        if (isNaN(cx) || isNaN(cy)) return null;
-        const pt = svg.createSVGPoint();
-        pt.x = cx;
-        pt.y = cy;
-        const m = pivotCircle.getCTM();
-        if (!m) return { x: cx, y: cy };
-        const p = pt.matrixTransform(m);
-        return { x: p.x, y: p.y };
+        const partNode = svg.querySelector(`#${partId}`) as Element | null;
+        if (!partNode) return null;
+
+        // Only data-pivot (on self or descendant)
+        const pivotSource = ((): Element | null => {
+            if (partNode.getAttribute('data-pivot')) return partNode;
+            const d = partNode.querySelector('[data-pivot]');
+            if (d) return d as Element;
+            return null;
+        })();
+        if (!pivotSource) return null;
+
+        const pivotAttr = pivotSource.getAttribute('data-pivot');
+        if (!pivotAttr) return null;
+        const match = pivotAttr.match(/(-?\d*\.?\d+)\s*,\s*(-?\d*\.?\d+)/);
+        if (!match) return null;
+        const x = parseFloat(match[1]);
+        const y = parseFloat(match[2]);
+        if (Number.isNaN(x) || Number.isNaN(y)) return null;
+        // data-pivot is in the SVG/viewBox coordinate space already
+        return { x, y };
     };
 
     const handlePointerMove = useCallback((e: PointerEvent) => {

@@ -18,6 +18,20 @@ export const getSvgDimensions = (svgString: string): { width: number; height: nu
     return { width: 200, height: 200 }; // Fallback
 };
 
+// Return list of interactive part ids from a pantin SVG content
+export const getInteractiveParts = (svgString: string): string[] => {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgString, 'image/svg+xml');
+    const svg = doc.querySelector('svg');
+    if (!svg) return [];
+    const nodes = svg.querySelectorAll('[data-interactive="true"][id]');
+    return Array.from(nodes).map(n => (n as Element).getAttribute('id') || '').filter(Boolean);
+  } catch {
+    return [];
+  }
+};
+
 export interface SpotlightParams {
   shape?: 'ellipse' | 'cone';
   coneAngle?: number; // degrees

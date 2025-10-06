@@ -42,12 +42,7 @@ export interface SvgObject {
   };
 }
 
-export const ARTICULABLE_PARTS = [
-    'tete', 'haut_bras_droite', 'avant_bras_droite', 'main_droite',
-    'haut_bras_gauche', 'avant_bras_gauche', 'main_gauche',
-    'cuisse_droite', 'tibia_droite', 'pied_droite',
-    'cuisse_gauche', 'tibia_gauche', 'pied_gauche',
-];
+// Static articulation list removed; use data-* from SVGs to discover parts dynamically.
 
 
 export type CanvasRef = {

@@ -1,6 +1,6 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import type { SvgObject } from '../types';
-import { ARTICULABLE_PARTS } from '../types';
+import { getInteractiveParts } from './utils';
 import { ChevronsRightLeftIcon, SlidersIcon, RotateCwIcon, EyeIcon } from './icons';
 import { generateSpotlightSvg } from './utils';
 import { processSvg } from './utils';
@@ -174,13 +174,14 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onDetachObject, 
     const current = selectedObject.articulation || {};
     const next: { [k: string]: number } = {};
     // First copy non-mirrored parts as-is
-    ARTICULABLE_PARTS.forEach((p) => {
+    const parts = selectedObject ? getInteractiveParts(selectedObject.content) : [];
+    parts.forEach((p) => {
       if (!MIRROR_MAP[p]) {
         if (current[p] !== undefined) next[p] = current[p]!;
       }
     });
     // Then handle mirrored pairs once (start from *_gauche)
-    ARTICULABLE_PARTS.forEach((left) => {
+    parts.forEach((left) => {
       if (!/_gauche$/.test(left)) return;
       const right = MIRROR_MAP[left];
       if (!right) return;
@@ -198,7 +199,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onDetachObject, 
     if (!selectedObject) return;
     const current = selectedObject.articulation || {};
     const next = { ...(current as any) } as { [k: string]: number };
-    ARTICULABLE_PARTS.forEach((left) => {
+    const parts = selectedObject ? getInteractiveParts(selectedObject.content) : [];
+    parts.forEach((left) => {
       if (!/_gauche$/.test(left)) return;
       const right = MIRROR_MAP[left];
       if (!right) return;
@@ -214,7 +216,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onDetachObject, 
     if (!selectedObject) return;
     const current = selectedObject.articulation || {};
     const next = { ...(current as any) } as { [k: string]: number };
-    ARTICULABLE_PARTS.forEach((right) => {
+    const parts = selectedObject ? getInteractiveParts(selectedObject.content) : [];
+    parts.forEach((right) => {
       if (!/_droite$/.test(right)) return;
       const left = MIRROR_MAP[right];
       if (!left) return;
@@ -227,11 +230,12 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onDetachObject, 
   };
 
   // Articulation listview state
-  const [selectedPart, setSelectedPart] = useState<string>('tete');
+  const [selectedPart, setSelectedPart] = useState<string>('');
+  const interactiveParts = useMemo(() => selectedObject ? getInteractiveParts(selectedObject.content) : [], [selectedObject]);
   useEffect(() => {
-    // Ensure selectedPart exists among articulables
-    if (!ARTICULABLE_PARTS.includes(selectedPart)) setSelectedPart(ARTICULABLE_PARTS[0] || '');
-  }, [selectedPart]);
+    if (interactiveParts.length === 0) { setSelectedPart(''); return; }
+    if (!selectedPart || !interactiveParts.includes(selectedPart)) setSelectedPart(interactiveParts[0]);
+  }, [interactiveParts, selectedPart]);
 
   // Helper to update spotlight safely
   const applySpot = (patch: Partial<NonNullable<SvgObject['spotlight']>>) => {
@@ -256,7 +260,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onDetachObject, 
     if (!selectedObject) return;
     const current = selectedObject.articulation || {};
     const next = { ...(current as any) } as { [k: string]: number };
-    ARTICULABLE_PARTS.forEach((left) => {
+    const parts = selectedObject ? getInteractiveParts(selectedObject.content) : [];
+    parts.forEach((left) => {
       if (/_gauche$/.test(left)) {
         next[left] = 0;
       }
@@ -268,7 +273,8 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onDetachObject, 
     if (!selectedObject) return;
     const current = selectedObject.articulation || {};
     const next = { ...(current as any) } as { [k: string]: number };
-    ARTICULABLE_PARTS.forEach((right) => {
+    const parts = selectedObject ? getInteractiveParts(selectedObject.content) : [];
+    parts.forEach((right) => {
       if (/_droite$/.test(right)) {
         next[right] = 0;
       }
@@ -552,10 +558,10 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onDetachObject, 
             <div className="inspector-group">
               {/* Navigation between parts */}
               {(() => {
-                const idx = Math.max(0, ARTICULABLE_PARTS.indexOf(selectedPart));
-                const len = ARTICULABLE_PARTS.length;
-                const goPrev = () => setSelectedPart(ARTICULABLE_PARTS[(idx - 1 + len) % len]);
-                const goNext = () => setSelectedPart(ARTICULABLE_PARTS[(idx + 1) % len]);
+                const idx = Math.max(0, interactiveParts.indexOf(selectedPart));
+                const len = interactiveParts.length;
+                const goPrev = () => { if (len) setSelectedPart(interactiveParts[(idx - 1 + len) % len]); };
+                const goNext = () => { if (len) setSelectedPart(interactiveParts[(idx + 1) % len]); };
                 return (
                   <div className="inspector-row one-col">
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -603,7 +609,7 @@ export const InspectorPanel: React.FC<InspectorPanelProps> = ({ onDetachObject, 
               {/* List of parts with live angles */}
               <div className="inspector-row one-col" style={{ gap: 4 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
-                  {ARTICULABLE_PARTS.map((part) => {
+                  {interactiveParts.map((part) => {
                     const isFlipped = selectedObject.flipped;
                     const controlled = (isFlipped && MIRROR_MAP[part]) ? MIRROR_MAP[part] : part;
                     let val = selectedObject.articulation?.[controlled] || 0;

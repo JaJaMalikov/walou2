@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { SvgObject } from '../types';
-import { ARTICULABLE_PARTS } from '../types';
+import { getInteractiveParts } from './utils';
 import { useEditorStore } from '../stores/editorStore';
 import { useTimelineStore } from '../stores/timelineStore';
 
@@ -108,7 +108,7 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetId, onAtta
                   <div key={puppet.id} className="submenu-group">
                     <span className="submenu-group-title">{getDisplayName(puppet)}</span>
                     <ul>
-                      {ARTICULABLE_PARTS.map(limb => (
+                      {getInteractiveParts(puppet.content).map(limb => (
                         <li 
                           key={`${puppet.id}-${limb}`}
                           className="context-menu-item"

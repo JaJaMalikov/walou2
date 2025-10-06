@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { TimelineState, TimelineTrack, TimelineProperty } from '../types';
-import { ARTICULABLE_PARTS } from '../types';
+import { getInteractiveParts } from './utils';
 import { useTimelineStore } from '../stores/timelineStore';
 import { useEditorStore } from '../stores/editorStore';
 
@@ -119,7 +119,8 @@ export const Timeline: React.FC = () => {
       if (property === 'position') return { id: uid(), objectId, property: 'position', keyframes: [] } as TimelineTrack;
       if (property === 'rotation') return { id: uid(), objectId, property: 'rotation', keyframes: [] } as TimelineTrack;
       if (property === 'visibility') return { id: uid(), objectId, property: 'visibility', keyframes: [] } as TimelineTrack;
-      return { id: uid(), objectId, property: 'articulation', part: part || ARTICULABLE_PARTS[0], keyframes: [] } as TimelineTrack;
+      const parts = selectedObject ? getInteractiveParts(selectedObject.content) : [];
+      return { id: uid(), objectId, property: 'articulation', part: part || parts[0], keyframes: [] } as TimelineTrack;
     };
 
     const nextTracks = [...tracks];
@@ -150,7 +151,8 @@ export const Timeline: React.FC = () => {
       t.keyframes.push({ frame: at, value: vis, interpolation: 'step' });
       t.keyframes.sort((a: any, b: any) => a.frame - b.frame);
     } else if (property === 'articulation') {
-      const angle = selectedObject.articulation?.[part || ARTICULABLE_PARTS[0]] ?? 0;
+      const parts = selectedObject ? getInteractiveParts(selectedObject.content) : [];
+      const angle = selectedObject.articulation?.[part || parts[0]] ?? 0;
       const t = nextTracks.find(t => t === track) as any;
       t.keyframes = removeAtSame(t.keyframes);
       t.keyframes.push({ frame: at, value: angle, interpolation: 'linear' });
@@ -163,7 +165,12 @@ export const Timeline: React.FC = () => {
   const scrubToLocal = (f: number) => scrubTo(f);
 
   const [kfProp, setKfProp] = useState<TimelineProperty>('position');
-  const [kfPart, setKfPart] = useState<string>(ARTICULABLE_PARTS[0]);
+  const [kfPart, setKfPart] = useState<string>('');
+  useEffect(() => {
+    const parts = selectedObject ? getInteractiveParts(selectedObject.content) : [];
+    if (!parts || parts.length === 0) { setKfPart(''); return; }
+    if (!kfPart || !parts.includes(kfPart)) setKfPart(parts[0]);
+  }, [selectedObject]);
 
   const laneClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -213,7 +220,7 @@ export const Timeline: React.FC = () => {
         </select>
         {kfProp === 'articulation' && (
           <select value={kfPart} onChange={e => setKfPart(e.target.value)}>
-            {ARTICULABLE_PARTS.map(p => (
+            {(selectedObject ? getInteractiveParts(selectedObject.content) : []).map(p => (
               <option key={p} value={p}>{p}</option>
             ))}
           </select>
