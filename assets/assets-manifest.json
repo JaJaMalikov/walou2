@@ -35,6 +35,11 @@
     "category": "pantins"
   },
   {
+    "name": "PANTIN SVG ATTRIBUTES",
+    "path": "pantins/PANTIN_SVG_ATTRIBUTES.md",
+    "category": "pantins"
+  },
+  {
     "name": "Bab manu",
     "path": "pantins/bab_manu.svg",
     "category": "pantins"
